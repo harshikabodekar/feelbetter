@@ -1,12 +1,14 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import { useRouter } from "next/navigation"
 
 export default function Home() {
   const scrollTextRef = useRef(null)
   const canvasRef = useRef(null)
+  const videoRef = useRef(null)
   const router = useRouter()
+  const [videoEnded, setVideoEnded] = useState(false)
 
   // realistic wave on canvas
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function Home() {
       { x: "100vw" },
       {
         x: "-100%",
-        duration: 40,
+        duration: 12,
         ease: "none",
         repeat: -1,
       }
@@ -87,7 +89,7 @@ export default function Home() {
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "var(--font-merriweather-sans), sans-serif",
+      fontFamily: "Georgia, serif",
       background: "linear-gradient(180deg, #03214a 0%, #06527a 35%, #0e8fa3 65%, #a8e6e8 100%)",
       overflow: "hidden",
       position: "relative",
@@ -101,7 +103,7 @@ export default function Home() {
         gap: "14px",
         zIndex: 2,
       }}>
-        {/* logo mark
+        {/* logo mark */}
         <div style={{
           width: "75px",
           height: "75px",
@@ -113,12 +115,13 @@ export default function Home() {
           background: "rgba(255,255,255,0.07)",
           backdropFilter: "blur(6px)",
         }}>
-        </div> */}
+          <span style={{ fontSize: "2rem" }}>🌊</span>
+        </div>
 
         {/* app name */}
         <h1 style={{
           color: "#e8f8f9",
-          fontSize: "6rem",
+          fontSize: "3rem",
           fontWeight: "700",
           margin: "0",
           letterSpacing: "0.12em",
@@ -130,7 +133,7 @@ export default function Home() {
         {/* tagline */}
         <p style={{
           color: "rgba(232,248,249,0.85)",
-          fontSize: "3rem",
+          fontSize: "1rem",
           letterSpacing: "0.22em",
           margin: "0",
           fontWeight: "600",
@@ -152,7 +155,7 @@ export default function Home() {
             fontWeight: "700",
             letterSpacing: "0.15em",
             cursor: "pointer",
-            fontFamily: "var(--font-merriweather-sans), sans-serif",
+            fontFamily: "Georgia, serif",
             backdropFilter: "blur(6px)",
           }}>
           enter →
@@ -177,7 +180,7 @@ export default function Home() {
         zIndex: 3,
       }}>
         <p ref={scrollTextRef} style={{
-          color: "darkslategray",
+          color: "rgba(232,248,249,0.9)",
           fontSize: "1.4rem",
           fontWeight: "800",
           margin: "0",

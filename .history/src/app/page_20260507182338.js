@@ -73,7 +73,7 @@ export default function Home() {
       { x: "100vw" },
       {
         x: "-100%",
-        duration: 40,
+        duration: 12,
         ease: "none",
         repeat: -1,
       }
@@ -87,7 +87,7 @@ export default function Home() {
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "var(--font-merriweather-sans), sans-serif",
+      fontFamily: "Georgia, serif",
       background: "linear-gradient(180deg, #03214a 0%, #06527a 35%, #0e8fa3 65%, #a8e6e8 100%)",
       overflow: "hidden",
       position: "relative",
@@ -101,7 +101,7 @@ export default function Home() {
         gap: "14px",
         zIndex: 2,
       }}>
-        {/* logo mark
+        {/* logo mark */}
         <div style={{
           width: "75px",
           height: "75px",
@@ -113,83 +113,7 @@ export default function Home() {
           background: "rgba(255,255,255,0.07)",
           backdropFilter: "blur(6px)",
         }}>
-        </div> */}
+          <span style={{ fontSize: "2rem" }}>🌊</span>
+        </div>
 
-        {/* app name */}
-        <h1 style={{
-          color: "#e8f8f9",
-          fontSize: "6rem",
-          fontWeight: "700",
-          margin: "0",
-          letterSpacing: "0.12em",
-          textShadow: "0 2px 20px rgba(14,143,163,0.5)",
-        }}>
-          feelbetter
-        </h1>
-
-        {/* tagline */}
-        <p style={{
-          color: "rgba(232,248,249,0.85)",
-          fontSize: "3rem",
-          letterSpacing: "0.22em",
-          margin: "0",
-          fontWeight: "600",
-        }}>
-          a safe space for your feelings
-        </p>
-
-        {/* go button */}
-        <button
-          onClick={() => router.push("/login")}
-          style={{
-            marginTop: "24px",
-            background: "rgba(255,255,255,0.1)",
-            border: "2px solid rgba(168,230,232,0.7)",
-            color: "#e8f8f9",
-            padding: "12px 36px",
-            borderRadius: "30px",
-            fontSize: "1rem",
-            fontWeight: "700",
-            letterSpacing: "0.15em",
-            cursor: "pointer",
-            fontFamily: "var(--font-merriweather-sans), sans-serif",
-            backdropFilter: "blur(6px)",
-          }}>
-          enter →
-        </button>
-      </div>
-
-      {/* realistic canvas waves */}
-      <canvas ref={canvasRef} style={{
-        position: "absolute",
-        bottom: "60px",
-        left: "0",
-        width: "100%",
-        zIndex: 1,
-      }} />
-
-      {/* scrolling bold text */}
-      <div style={{
-        position: "absolute",
-        bottom: "18px",
-        width: "100%",
-        overflow: "hidden",
-        zIndex: 3,
-      }}>
-        <p ref={scrollTextRef} style={{
-          color: "darkslategray",
-          fontSize: "1.4rem",
-          fontWeight: "800",
-          margin: "0",
-          whiteSpace: "nowrap",
-          letterSpacing: "0.2em",
-          display: "inline-block",
-          textShadow: "0 1px 10px rgba(14,143,163,0.6)",
-        }}>
-          breathe. feel. heal. &nbsp;&nbsp;&nbsp;&nbsp; breathe. feel. heal. &nbsp;&nbsp;&nbsp;&nbsp; breathe. feel. heal. &nbsp;&nbsp;&nbsp;&nbsp;
-        </p>
-      </div>
-
-    </main>
-  )
-}
+        {/

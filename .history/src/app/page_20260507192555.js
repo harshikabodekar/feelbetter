@@ -1,11 +1,13 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import { useRouter } from "next/navigation"
 
 export default function Home() {
   const scrollTextRef = useRef(null)
   const canvasRef = useRef(null)
+  const videoRef = useRef(null)
+  const logoContainerRef = useRef(null)
   const router = useRouter()
 
   // realistic wave on canvas
@@ -67,17 +69,35 @@ export default function Home() {
     }
   }, [])
 
-  // scrolling text — no fade, immediate
+  // scrolling text and logo animation synchronized
   useEffect(() => {
-    gsap.fromTo(scrollTextRef.current,
+    const tl = gsap.timeline()
+
+    // Animate the video/logo: move from right to center and scale down
+    tl.fromTo(logoContainerRef.current,
+      { x: "100vw", scale: 1.2, opacity: 1 },
+      {
+        x: "-50vw",
+        scale: 0.3,
+        duration: 12,
+        ease: "none",
+      },
+      0
+    )
+
+    // Animate the scrolling text at the same time
+    tl.fromTo(scrollTextRef.current,
       { x: "100vw" },
       {
         x: "-100%",
-        duration: 40,
+        duration: 12,
         ease: "none",
-        repeat: -1,
-      }
+      },
+      0
     )
+
+    // Repeat the animation infinitely
+    tl.repeat(-1)
   }, [])
 
   return (
@@ -87,76 +107,44 @@ export default function Home() {
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "var(--font-merriweather-sans), sans-serif",
+      fontFamily: "Georgia, serif",
       background: "linear-gradient(180deg, #03214a 0%, #06527a 35%, #0e8fa3 65%, #a8e6e8 100%)",
       overflow: "hidden",
       position: "relative",
     }}>
 
-      {/* logo */}
-      <div style={{
+      {/* logo/video container with animation */}
+      <div ref={logoContainerRef} style={{
+        position: "absolute",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         gap: "14px",
-        zIndex: 2,
+        zIndex: 5,
+        transformOrigin: "center",
       }}>
-        {/* logo mark
-        <div style={{
-          width: "75px",
-          height: "75px",
-          borderRadius: "50%",
-          border: "2.5px solid rgba(168,230,232,0.8)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "rgba(255,255,255,0.07)",
-          backdropFilter: "blur(6px)",
-        }}>
-        </div> */}
-
-        {/* app name */}
-        <h1 style={{
-          color: "#e8f8f9",
-          fontSize: "6rem",
-          fontWeight: "700",
-          margin: "0",
-          letterSpacing: "0.12em",
-          textShadow: "0 2px 20px rgba(14,143,163,0.5)",
-        }}>
-          feelbetter
-        </h1>
-
-        {/* tagline */}
-        <p style={{
-          color: "rgba(232,248,249,0.85)",
-          fontSize: "3rem",
-          letterSpacing: "0.22em",
-          margin: "0",
-          fontWeight: "600",
-        }}>
-          a safe space for your feelings
-        </p>
-
-        {/* go button */}
-        <button
-          onClick={() => router.push("/login")}
+        {/* video in place of logo mark */}
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          playsInline
           style={{
-            marginTop: "24px",
-            background: "rgba(255,255,255,0.1)",
-            border: "2px solid rgba(168,230,232,0.7)",
-            color: "#e8f8f9",
-            padding: "12px 36px",
-            borderRadius: "30px",
-            fontSize: "1rem",
-            fontWeight: "700",
-            letterSpacing: "0.15em",
-            cursor: "pointer",
-            fontFamily: "var(--font-merriweather-sans), sans-serif",
+            width: "75px",
+            height: "75px",
+            borderRadius: "50%",
+            border: "2.5px solid rgba(168,230,232,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(255,255,255,0.07)",
             backdropFilter: "blur(6px)",
-          }}>
-          enter →
-        </button>
+            objectFit: "cover",
+          }}
+        >
+          <source src="/wave.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
       </div>
 
       {/* realistic canvas waves */}
@@ -174,10 +162,10 @@ export default function Home() {
         bottom: "18px",
         width: "100%",
         overflow: "hidden",
-        zIndex: 3,
+        zIndex: 2,
       }}>
         <p ref={scrollTextRef} style={{
-          color: "darkslategray",
+          color: "rgba(232,248,249,0.9)",
           fontSize: "1.4rem",
           fontWeight: "800",
           margin: "0",

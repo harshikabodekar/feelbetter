@@ -101,7 +101,7 @@ export default function Home() {
         gap: "14px",
         zIndex: 2,
       }}>
-        {/* logo mark
+        {/* logo mark */}
         <div style={{
           width: "75px",
           height: "75px",
@@ -113,7 +113,7 @@ export default function Home() {
           background: "rgba(255,255,255,0.07)",
           backdropFilter: "blur(6px)",
         }}>
-        </div> */}
+        </div>
 
         {/* app name */}
         <h1 style={{

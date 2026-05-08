@@ -1,11 +1,13 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import { useRouter } from "next/navigation"
 
 export default function Home() {
   const scrollTextRef = useRef(null)
   const canvasRef = useRef(null)
+  const videoRef = useRef(null)
+  const logoContainerRef = useRef(null)
   const router = useRouter()
 
   // realistic wave on canvas
@@ -67,17 +69,9 @@ export default function Home() {
     }
   }, [])
 
-  // scrolling text — no fade, immediate
+  // scrolling text animation only
   useEffect(() => {
-    gsap.fromTo(scrollTextRef.current,
-      { x: "100vw" },
-      {
-        x: "-100%",
-        duration: 40,
-        ease: "none",
-        repeat: -1,
-      }
-    )
+    // No animation - text stays fixed and centered
   }, [])
 
   return (
@@ -87,38 +81,45 @@ export default function Home() {
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "var(--font-merriweather-sans), sans-serif",
+      fontFamily: "Georgia, serif",
       background: "linear-gradient(180deg, #03214a 0%, #06527a 35%, #0e8fa3 65%, #a8e6e8 100%)",
       overflow: "hidden",
       position: "relative",
     }}>
 
-      {/* logo */}
-      <div style={{
+      {/* logo/video container - stays centered */}
+      <div ref={logoContainerRef} style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: "14px",
-        zIndex: 2,
+        gap: "20px",
+        zIndex: 5,
+        position: "relative",
       }}>
-        {/* logo mark
-        <div style={{
-          width: "75px",
-          height: "75px",
-          borderRadius: "50%",
-          border: "2.5px solid rgba(168,230,232,0.8)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "rgba(255,255,255,0.07)",
-          backdropFilter: "blur(6px)",
-        }}>
-        </div> */}
+        {/* video in place of logo mark */}
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          playsInline
+          style={{
+            width: "150px",
+            height: "150px",
+            borderRadius: "50%",
+            border: "3px solid rgba(168,230,232,0.8)",
+            background: "rgba(255,255,255,0.07)",
+            backdropFilter: "blur(6px)",
+            objectFit: "cover",
+          }}
+        >
+          <source src="/wave.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
 
         {/* app name */}
         <h1 style={{
           color: "#e8f8f9",
-          fontSize: "6rem",
+          fontSize: "4.5rem",
           fontWeight: "700",
           margin: "0",
           letterSpacing: "0.12em",
@@ -130,7 +131,7 @@ export default function Home() {
         {/* tagline */}
         <p style={{
           color: "rgba(232,248,249,0.85)",
-          fontSize: "3rem",
+          fontSize: "1.3rem",
           letterSpacing: "0.22em",
           margin: "0",
           fontWeight: "600",
@@ -142,17 +143,17 @@ export default function Home() {
         <button
           onClick={() => router.push("/login")}
           style={{
-            marginTop: "24px",
+            marginTop: "30px",
             background: "rgba(255,255,255,0.1)",
             border: "2px solid rgba(168,230,232,0.7)",
             color: "#e8f8f9",
-            padding: "12px 36px",
+            padding: "14px 40px",
             borderRadius: "30px",
-            fontSize: "1rem",
+            fontSize: "1.1rem",
             fontWeight: "700",
             letterSpacing: "0.15em",
             cursor: "pointer",
-            fontFamily: "var(--font-merriweather-sans), sans-serif",
+            fontFamily: "Georgia, serif",
             backdropFilter: "blur(6px)",
           }}>
           enter →
@@ -168,25 +169,25 @@ export default function Home() {
         zIndex: 1,
       }} />
 
-      {/* scrolling bold text */}
+      {/* scrolling bold text - now fixed and centered */}
       <div style={{
         position: "absolute",
         bottom: "18px",
         width: "100%",
-        overflow: "hidden",
-        zIndex: 3,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 2,
       }}>
         <p ref={scrollTextRef} style={{
-          color: "darkslategray",
+          color: "rgba(232,248,249,0.9)",
           fontSize: "1.4rem",
           fontWeight: "800",
           margin: "0",
-          whiteSpace: "nowrap",
           letterSpacing: "0.2em",
-          display: "inline-block",
           textShadow: "0 1px 10px rgba(14,143,163,0.6)",
         }}>
-          breathe. feel. heal. &nbsp;&nbsp;&nbsp;&nbsp; breathe. feel. heal. &nbsp;&nbsp;&nbsp;&nbsp; breathe. feel. heal. &nbsp;&nbsp;&nbsp;&nbsp;
+          breathe. feel. heal.
         </p>
       </div>
 

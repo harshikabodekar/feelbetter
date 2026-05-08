@@ -1,12 +1,14 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import { useRouter } from "next/navigation"
 
 export default function Home() {
   const scrollTextRef = useRef(null)
   const canvasRef = useRef(null)
+  const videoRef = useRef(null)
   const router = useRouter()
+  const [videoEnded, setVideoEnded] = useState(false)
 
   // realistic wave on canvas
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function Home() {
       { x: "100vw" },
       {
         x: "-100%",
-        duration: 40,
+        duration: 12,
         ease: "none",
         repeat: -1,
       }
@@ -83,101 +85,143 @@ export default function Home() {
   return (
     <main style={{
       minHeight: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: "var(--font-merriweather-sans), sans-serif",
+      display: "grid",
+      gridTemplateColumns: "1fr",
+      gridTemplateRows: "1fr",
+      fontFamily: "Georgia, serif",
       background: "linear-gradient(180deg, #03214a 0%, #06527a 35%, #0e8fa3 65%, #a8e6e8 100%)",
       overflow: "hidden",
       position: "relative",
     }}>
 
-      {/* logo */}
+      {/* video plays first */}
+      <video
+        ref={videoRef}
+        autoPlay
+        onEnded={() => setVideoEnded(true)}
+        style={{
+          gridColumn: "1",
+          gridRow: "1",
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          zIndex: videoEnded ? 0 : 10,
+          opacity: videoEnded ? 0 : 1,
+          transition: "opacity 0.8s ease-in-out",
+        }}
+      >
+        <source src="/wave.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+
+      {/* page content shows after video */}
       <div style={{
+        gridColumn: "1",
+        gridRow: "1",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: "14px",
-        zIndex: 2,
+        justifyContent: "center",
+        zIndex: videoEnded ? 2 : -1,
+        opacity: videoEnded ? 1 : 0,
+        transition: "opacity 0.8s ease-in-out",
       }}>
-        {/* logo mark
+        {/* logo */}
         <div style={{
-          width: "75px",
-          height: "75px",
-          borderRadius: "50%",
-          border: "2.5px solid rgba(168,230,232,0.8)",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          background: "rgba(255,255,255,0.07)",
-          backdropFilter: "blur(6px)",
+          gap: "14px",
+          zIndex: 2,
         }}>
-        </div> */}
-
-        {/* app name */}
-        <h1 style={{
-          color: "#e8f8f9",
-          fontSize: "6rem",
-          fontWeight: "700",
-          margin: "0",
-          letterSpacing: "0.12em",
-          textShadow: "0 2px 20px rgba(14,143,163,0.5)",
-        }}>
-          feelbetter
-        </h1>
-
-        {/* tagline */}
-        <p style={{
-          color: "rgba(232,248,249,0.85)",
-          fontSize: "3rem",
-          letterSpacing: "0.22em",
-          margin: "0",
-          fontWeight: "600",
-        }}>
-          a safe space for your feelings
-        </p>
-
-        {/* go button */}
-        <button
-          onClick={() => router.push("/login")}
-          style={{
-            marginTop: "24px",
-            background: "rgba(255,255,255,0.1)",
-            border: "2px solid rgba(168,230,232,0.7)",
-            color: "#e8f8f9",
-            padding: "12px 36px",
-            borderRadius: "30px",
-            fontSize: "1rem",
-            fontWeight: "700",
-            letterSpacing: "0.15em",
-            cursor: "pointer",
-            fontFamily: "var(--font-merriweather-sans), sans-serif",
+          {/* logo mark */}
+          <div style={{
+            width: "75px",
+            height: "75px",
+            borderRadius: "50%",
+            border: "2.5px solid rgba(168,230,232,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(255,255,255,0.07)",
             backdropFilter: "blur(6px)",
           }}>
-          enter →
-        </button>
+            <span style={{ fontSize: "2rem" }}>🌊</span>
+          </div>
+
+          {/* app name */}
+          <h1 style={{
+            color: "#e8f8f9",
+            fontSize: "3rem",
+            fontWeight: "700",
+            margin: "0",
+            letterSpacing: "0.12em",
+            textShadow: "0 2px 20px rgba(14,143,163,0.5)",
+          }}>
+            feelbetter
+          </h1>
+
+          {/* tagline */}
+          <p style={{
+            color: "rgba(232,248,249,0.85)",
+            fontSize: "1rem",
+            letterSpacing: "0.22em",
+            margin: "0",
+            fontWeight: "600",
+          }}>
+            a safe space for your feelings
+          </p>
+
+          {/* go button */}
+          <button
+            onClick={() => router.push("/login")}
+            style={{
+              marginTop: "24px",
+              background: "rgba(255,255,255,0.1)",
+              border: "2px solid rgba(168,230,232,0.7)",
+              color: "#e8f8f9",
+              padding: "12px 36px",
+              borderRadius: "30px",
+              fontSize: "1rem",
+              fontWeight: "700",
+              letterSpacing: "0.15em",
+              cursor: "pointer",
+              fontFamily: "Georgia, serif",
+              backdropFilter: "blur(6px)",
+              transition: "all 0.3s ease",
+            }}>
+            enter →
+          </button>
+        </div>
       </div>
 
       {/* realistic canvas waves */}
       <canvas ref={canvasRef} style={{
+        gridColumn: "1",
+        gridRow: "1",
         position: "absolute",
         bottom: "60px",
         left: "0",
         width: "100%",
-        zIndex: 1,
+        zIndex: videoEnded ? 1 : -1,
+        opacity: videoEnded ? 1 : 0,
+        transition: "opacity 0.8s ease-in-out",
       }} />
 
       {/* scrolling bold text */}
       <div style={{
+        gridColumn: "1",
+        gridRow: "1",
         position: "absolute",
         bottom: "18px",
         width: "100%",
         overflow: "hidden",
-        zIndex: 3,
+        zIndex: videoEnded ? 3 : -1,
+        opacity: videoEnded ? 1 : 0,
+        transition: "opacity 0.8s ease-in-out",
       }}>
         <p ref={scrollTextRef} style={{
-          color: "darkslategray",
+          color: "rgba(232,248,249,0.9)",
           fontSize: "1.4rem",
           fontWeight: "800",
           margin: "0",
