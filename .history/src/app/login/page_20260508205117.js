@@ -291,10 +291,7 @@ export default function LoginPage() {
             </button>
 
             {/* guest */}
-            <button onClick={() => {
-              localStorage.setItem('userName', 'Guest')
-              router.push('/dashboard')
-            }} style={{
+            <button onClick={() => router.push('/dashboard')} style={{
               width: '100%', padding: '0.9rem',
               background: 'transparent',
               color: 'rgba(232,248,249,0.55)',
