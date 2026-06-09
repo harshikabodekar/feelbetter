@@ -56,6 +56,13 @@ export const metadata = {
   description: "a safe space for your feelings",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${merriweatherSans.variable} ${dmSans.variable} ${dmSerif.variable} h-full antialiased`}>

@@ -13,12 +13,14 @@ export default function Home() {
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
     canvas.width = window.innerWidth
-    canvas.height = 220
+    // Responsive canvas height based on viewport
+    canvas.height = window.innerHeight < 640 ? 150 : 220
 
+    const isMobile = window.innerHeight < 640
     const waves = [
-      { amplitude: 28, frequency: 0.018, speed: 0.03, offset: 0, color: "rgba(14,143,163,0.5)" },
-      { amplitude: 20, frequency: 0.022, speed: 0.045, offset: 2, color: "rgba(20,180,200,0.35)" },
-      { amplitude: 14, frequency: 0.03, speed: 0.06, offset: 4, color: "rgba(168,230,232,0.25)" },
+      { amplitude: isMobile ? 16 : 28, frequency: 0.018, speed: 0.03, offset: 0, color: "rgba(14,143,163,0.5)" },
+      { amplitude: isMobile ? 12 : 20, frequency: 0.022, speed: 0.045, offset: 2, color: "rgba(20,180,200,0.35)" },
+      { amplitude: isMobile ? 8 : 14, frequency: 0.03, speed: 0.06, offset: 4, color: "rgba(168,230,232,0.25)" },
     ]
 
     let frame = 0

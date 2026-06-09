@@ -13,7 +13,8 @@ export default function Home() {
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
     canvas.width = window.innerWidth
-    canvas.height = 220
+    // Responsive canvas height based on viewport
+    canvas.height = window.innerHeight < 640 ? 150 : 220
 
     const waves = [
       { amplitude: 28, frequency: 0.018, speed: 0.03, offset: 0, color: "rgba(14,143,163,0.5)" },

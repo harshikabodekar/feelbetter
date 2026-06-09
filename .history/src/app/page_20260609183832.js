@@ -13,12 +13,14 @@ export default function Home() {
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
     canvas.width = window.innerWidth
-    canvas.height = 220
+    // Responsive canvas height based on viewport
+    canvas.height = window.innerHeight < 640 ? 150 : 220
 
+    const isMobile = window.innerHeight < 640
     const waves = [
-      { amplitude: 28, frequency: 0.018, speed: 0.03, offset: 0, color: "rgba(14,143,163,0.5)" },
-      { amplitude: 20, frequency: 0.022, speed: 0.045, offset: 2, color: "rgba(20,180,200,0.35)" },
-      { amplitude: 14, frequency: 0.03, speed: 0.06, offset: 4, color: "rgba(168,230,232,0.25)" },
+      { amplitude: isMobile ? 16 : 28, frequency: 0.018, speed: 0.03, offset: 0, color: "rgba(14,143,163,0.5)" },
+      { amplitude: isMobile ? 12 : 20, frequency: 0.022, speed: 0.045, offset: 2, color: "rgba(20,180,200,0.35)" },
+      { amplitude: isMobile ? 8 : 14, frequency: 0.03, speed: 0.06, offset: 4, color: "rgba(168,230,232,0.25)" },
     ]
 
     let frame = 0
@@ -118,7 +120,7 @@ export default function Home() {
         {/* app name */}
         <h1 style={{
           color: "#e8f8f9",
-          fontSize: "6rem",
+          fontSize: "clamp(2rem, 10vw, 6rem)",
           fontWeight: "700",
           margin: "0",
           letterSpacing: "0.12em",
@@ -130,7 +132,7 @@ export default function Home() {
         {/* tagline */}
         <p style={{
           color: "rgba(232,248,249,0.85)",
-          fontSize: "3rem",
+          fontSize: "clamp(1.25rem, 5vw, 3rem)",
           letterSpacing: "0.22em",
           margin: "0",
           fontWeight: "600",
@@ -142,13 +144,13 @@ export default function Home() {
         <button
           onClick={() => router.push("/login")}
           style={{
-            marginTop: "24px",
+            marginTop: "clamp(16px, 5vw, 24px)",
             background: "rgba(255,255,255,0.1)",
             border: "2px solid rgba(168,230,232,0.7)",
             color: "#e8f8f9",
-            padding: "12px 36px",
+            padding: "clamp(10px, 3vw, 12px) clamp(24px, 8vw, 36px)",
             borderRadius: "30px",
-            fontSize: "1rem",
+            fontSize: "clamp(0.875rem, 3vw, 1rem)",
             fontWeight: "700",
             letterSpacing: "0.15em",
             cursor: "pointer",

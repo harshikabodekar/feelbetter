@@ -1089,12 +1089,19 @@ export default function Dashboard() {
 
         .fb-winddown-card {
           background: rgba(255,255,255,0.65);
-          border-radius: 32px; padding: 32px 40px;
-          display: flex; gap: 24px; align-items: center;
+          border-radius: clamp(16px, 4vw, 32px); padding: clamp(16px, 4vw, 32px) clamp(16px, 5vw, 40px);
+          display: flex; gap: clamp(12px, 3vw, 24px); align-items: center;
           margin-bottom: 20px;
           border: 0.5px solid rgba(255,255,255,0.95);
           width: 100%;
           backdrop-filter: blur(10px);
+          overflow: hidden;
+        }
+        @media (max-width: 640px) {
+          .fb-winddown-card {
+            flex-direction: column;
+            align-items: flex-start;
+          }
         }
 
         .fb-winddown-label {
@@ -1106,7 +1113,7 @@ export default function Dashboard() {
 
         .fb-winddown-title {
           font-family: var(--font-dm-serif), serif;
-          font-size: 28px; color: #0f2e35;
+          font-size: clamp(18px, 5vw, 28px); color: #0f2e35;
           margin-bottom: 6px; font-weight: 400;
         }
 
@@ -1132,9 +1139,16 @@ export default function Dashboard() {
         }
 
         .fb-blob {
-          width: 120px; height: 120px; border-radius: 50%;
+          width: clamp(80px, 15vw, 120px); height: clamp(80px, 15vw, 120px); border-radius: 50%;
           background: linear-gradient(145deg, #7ac4d0, #5aaabb);
           flex-shrink: 0; margin-left: auto;
+        }
+        @media (max-width: 640px) {
+          .fb-blob {
+            margin-left: 0;
+            align-self: flex-end;
+            margin-top: -20px;
+          }
         }
 
         .fb-footer {

@@ -942,8 +942,8 @@ export default function Dashboard() {
 
         .fb-card {
           background: rgba(255,255,255,0.65);
-          border-radius: 40px 20px 20px 40px;
-          padding: 36px 44px 48px;
+          border-radius: 56px;
+          padding: 36px 40px 32px;
           margin-bottom: 20px;
           border: 0.5px solid rgba(255,255,255,0.95);
           backdrop-filter: blur(10px);
