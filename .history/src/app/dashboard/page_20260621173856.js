@@ -1,14 +1,37 @@
 "use client"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/context/AuthContext"
 
 const MOODS = [
-  { id: "empty", label: "empty", color: "#515d6e", textColor: "#ffffff" },
-  { id: "overwhelmed", label: "overwhelmed", color: "#0a6878", textColor: "#ffffff" },
-  { id: "okayish", label: "okay-ish", color: "#7a8a5a", textColor: "#ffffff" },
-  { id: "heavy", label: "heavy", color: "#1a1060", textColor: "#ffffff" },
-  { id: "full", label: "full", color: "#d07030", textColor: "#ffffff" },
+  {
+    id: "empty",
+    label: "empty",
+    color: "#515d6e",
+    textColor: "#ffffff",
+  },
+  {
+    id: "overwhelmed",
+    label: "overwhelmed",
+    color: "#0a6878",
+    textColor: "#ffffff",
+  },
+  {
+    id: "okayish",
+    label: "okay-ish",
+    color: "#7a8a5a",
+    textColor: "#ffffff",
+  },
+  {
+    id: "heavy",
+    label: "heavy",
+    color: "#1a1060",
+    textColor: "#ffffff",
+  },
+  {
+    id: "full",
+    label: "full",
+    color: "#d07030",
+    textColor: "#ffffff",
+  },
 ]
 
 const BG_MAP = {
@@ -60,9 +83,6 @@ function getSubGreeting() {
 }
 
 export default function Dashboard() {
-  const router = useRouter()
-  const { user, loading, signOut } = useAuth()
-
   const [clock, setClock] = useState(getClock())
   const [activeMood, setActiveMood] = useState(null)
   const [breatheText, setBreatheText] = useState("tap to begin a 4·7·8 cycle")
@@ -70,16 +90,6 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [anonymousMode, setAnonymousMode] = useState(false)
-  const [isGuest, setIsGuest] = useState(false)
-
-  useEffect(() => {
-    const guest = localStorage.getItem('isGuest') === 'true'
-    setIsGuest(guest)
-
-    if (!loading && !user && !guest) {
-      router.replace('/login')
-    }
-  }, [user, loading])
 
   useEffect(() => {
     const t = setInterval(() => setClock(getClock()), 30000)
@@ -91,16 +101,6 @@ export default function Dashboard() {
       window.removeEventListener("resize", handleResize)
     }
   }, [])
-
-  const handleLogout = async () => {
-    await signOut()
-    router.push('/login')
-  }
-
-  // Derive display name: real user → guest → fallback
-  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there'
-  const firstName = fullName.split(' ')[0]
-  const initials = fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
   function startBreathe() {
     if (breatheActive) return
@@ -162,10 +162,10 @@ export default function Dashboard() {
         @media (min-width: 1024px) {
           .fb-sidebar {
             display: flex;
-            width: 320px;
           }
         }
 
+        /* mobile sidebar overlay */
         .fb-sidebar-overlay {
           position: fixed;
           top: 0;
@@ -194,7 +194,7 @@ export default function Dashboard() {
         }
 
         .fb-sidebar-top {
-          padding: 24px;
+          padding: 20px;
           border-bottom: 1px solid rgba(0, 0, 0, 0.08);
           flex-shrink: 0;
         }
@@ -226,20 +226,20 @@ export default function Dashboard() {
         .fb-profile {
           display: flex;
           align-items: flex-start;
-          gap: 14px;
-          margin-bottom: 24px;
+          gap: 12px;
+          margin-bottom: 20px;
         }
 
         .fb-profile-avatar {
-          width: 50px;
-          height: 50px;
+          width: 44px;
+          height: 44px;
           border-radius: 50%;
           background: linear-gradient(135deg, #7ac4d0, #5aaabb);
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
-          font-size: 15px;
+          font-size: 14px;
           font-weight: 600;
           flex-shrink: 0;
         }
@@ -249,13 +249,13 @@ export default function Dashboard() {
         }
 
         .fb-profile-name {
-          font-size: 16px;
+          font-size: 15px;
           color: #0f2e35;
           font-weight: 500;
         }
 
         .fb-profile-action {
-          font-size: 13px;
+          font-size: 12px;
           color: #4a8a96;
           cursor: pointer;
           text-decoration: underline;
@@ -264,9 +264,9 @@ export default function Dashboard() {
         .fb-anon-toggle {
           display: flex;
           align-items: center;
-          gap: 14px;
-          padding: 14px 0;
-          margin-bottom: 24px;
+          gap: 12px;
+          padding: 12px 0;
+          margin-bottom: 20px;
         }
 
         .fb-anon-icon {
@@ -275,25 +275,23 @@ export default function Dashboard() {
           display: flex;
           align-items: center;
           justify-content: center;
-          flex-shrink: 0;
         }
 
         .fb-anon-label {
-          font-size: 15px;
+          font-size: 14px;
           color: #1a3a42;
           flex: 1;
         }
 
         .fb-toggle {
-          width: 48px;
-          height: 26px;
+          width: 44px;
+          height: 24px;
           background: #d0d0d0;
-          border-radius: 13px;
+          border-radius: 12px;
           border: none;
           cursor: pointer;
           position: relative;
           transition: background 0.3s;
-          flex-shrink: 0;
         }
 
         .fb-toggle.on {
@@ -302,8 +300,8 @@ export default function Dashboard() {
 
         .fb-toggle-thumb {
           position: absolute;
-          top: 3px;
-          left: 3px;
+          top: 2px;
+          left: 2px;
           width: 20px;
           height: 20px;
           background: white;
@@ -312,17 +310,17 @@ export default function Dashboard() {
         }
 
         .fb-toggle.on .fb-toggle-thumb {
-          left: 25px;
+          left: 22px;
         }
 
         .fb-sidebar-middle {
           flex: 1;
-          padding: 0 24px;
+          padding: 0 20px;
           overflow-y: auto;
         }
 
         .fb-sidebar-section {
-          margin-bottom: 28px;
+          margin-bottom: 24px;
         }
 
         .fb-sidebar-section-label {
@@ -331,7 +329,7 @@ export default function Dashboard() {
           text-transform: uppercase;
           color: #4a8a96;
           font-weight: 500;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
           display: flex;
           align-items: center;
           gap: 8px;
@@ -339,12 +337,12 @@ export default function Dashboard() {
 
         .fb-mood-dots {
           display: flex;
-          gap: 10px;
+          gap: 8px;
         }
 
         .fb-mood-dot {
-          width: 24px;
-          height: 24px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
           background: #ccc;
           cursor: pointer;
@@ -352,18 +350,18 @@ export default function Dashboard() {
         }
 
         .fb-mood-dot:hover {
-          transform: scale(1.15);
+          transform: scale(1.1);
         }
 
         .fb-history-item {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 14px;
+          padding: 12px;
           background: rgba(255, 255, 255, 0.5);
           border-radius: 8px;
           cursor: pointer;
-          font-size: 15px;
+          font-size: 14px;
           color: #1a3a42;
         }
 
@@ -372,32 +370,32 @@ export default function Dashboard() {
         }
 
         .fb-lock-icon {
-          width: 18px;
-          height: 18px;
+          width: 16px;
+          height: 16px;
         }
 
         .fb-sound-selector {
-          font-size: 15px;
+          font-size: 14px;
           color: #1a3a42;
           cursor: pointer;
-          padding: 10px 0;
+          padding: 8px 0;
         }
 
         .fb-settings-item {
-          font-size: 15px;
+          font-size: 14px;
           color: #1a3a42;
           cursor: pointer;
-          padding: 10px 0;
+          padding: 8px 0;
         }
 
         .fb-sidebar-bottom {
-          padding: 24px;
+          padding: 20px;
           border-top: 1px solid rgba(0, 0, 0, 0.08);
           flex-shrink: 0;
         }
 
         .fb-logout {
-          font-size: 15px;
+          font-size: 14px;
           color: #4a8a96;
           cursor: pointer;
           display: flex;
@@ -473,19 +471,19 @@ export default function Dashboard() {
         /* MAIN CONTENT */
         .fb-main {
           flex: 1;
-          padding: 24px;
+          padding: 20px 16px 40px;
           overflow-y: auto;
         }
 
         @media (min-width: 768px) {
           .fb-main {
-            padding: 32px 48px;
+            padding: 24px 48px 48px;
           }
         }
 
         @media (min-width: 1024px) {
           .fb-main {
-            padding: 32px 48px;
+            padding: 32px 48px 48px;
           }
         }
 
@@ -511,13 +509,13 @@ export default function Dashboard() {
           font-size: 16px;
           color: #3a6a75;
           font-weight: 300;
-          margin-bottom: 32px;
+          margin-bottom: 28px;
         }
 
         @media (min-width: 768px) {
           .fb-subgreeting {
             font-size: 18px;
-            margin-bottom: 40px;
+            margin-bottom: 32px;
           }
         }
 
@@ -525,16 +523,17 @@ export default function Dashboard() {
         .fb-checkin-card {
           background: rgba(255, 255, 255, 0.65);
           border-radius: 32px;
-          padding: 32px 24px;
+          padding: 28px 20px;
           border: 0.5px solid rgba(255, 255, 255, 0.95);
           backdrop-filter: blur(10px);
-          margin-bottom: 24px;
+          margin-bottom: 20px;
+          min-height: auto;
         }
 
         @media (min-width: 768px) {
           .fb-checkin-card {
-            padding: 40px 32px;
-            margin-bottom: 28px;
+            padding: 40px;
+            margin-bottom: 24px;
           }
         }
 
@@ -557,7 +556,7 @@ export default function Dashboard() {
           line-height: 1.2;
           margin-bottom: 12px;
           font-weight: 400;
-          text-align: left;
+          text-align: center;
         }
 
         @media (min-width: 768px) {
@@ -572,24 +571,24 @@ export default function Dashboard() {
           color: #5a8a96;
           font-weight: 300;
           font-style: italic;
-          margin-bottom: 28px;
+          text-align: center;
+          margin-bottom: 24px;
         }
 
-        /* MOOD BLOBS - 3 on top, 2 on bottom */
+        /* MOOD BLOBS */
         .fb-moods-grid {
           display: flex;
           flex-wrap: wrap;
-          gap: 16px;
+          gap: 12px;
           justify-content: center;
         }
 
         @media (min-width: 768px) {
           .fb-moods-grid {
-            gap: 20px;
+            gap: 16px;
           }
         }
 
-        /* First 3 blobs take 1/3 width each, last 2 blobs centered on second row */
         .fb-mood-btn {
           border: none;
           background: none;
@@ -609,22 +608,9 @@ export default function Dashboard() {
 
         @media (min-width: 768px) {
           .fb-mood-btn {
-            width: 150px;
-            height: 150px;
+            width: 140px;
+            height: 140px;
           }
-        }
-
-        /* First 3 blobs: flex-basis 33% to force 3 per row */
-        .fb-mood-btn:nth-child(1),
-        .fb-mood-btn:nth-child(2),
-        .fb-mood-btn:nth-child(3) {
-          flex-basis: 33.333%;
-        }
-
-        /* Last 2 blobs: flex-basis for 2 on next row, centered */
-        .fb-mood-btn:nth-child(4),
-        .fb-mood-btn:nth-child(5) {
-          flex-basis: 50%;
         }
 
         .fb-mood-btn:hover {
@@ -661,7 +647,7 @@ export default function Dashboard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          margin-bottom: 24px;
+          margin-bottom: 20px;
           border: 0.5px solid rgba(255, 255, 255, 0.95);
           backdrop-filter: blur(10px);
           width: 100%;
@@ -669,7 +655,10 @@ export default function Dashboard() {
 
         @media (min-width: 768px) {
           .fb-breathe-card {
-            margin-bottom: 28px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 24px;
           }
         }
 
@@ -729,7 +718,7 @@ export default function Dashboard() {
           display: flex;
           align-items: center;
           gap: 16px;
-          margin-bottom: 24px;
+          margin-bottom: 20px;
           border: 0.5px solid rgba(255, 255, 255, 0.95);
           cursor: pointer;
           width: 100%;
@@ -741,7 +730,10 @@ export default function Dashboard() {
           .fb-whisper-card {
             padding: 24px 32px;
             gap: 20px;
-            margin-bottom: 28px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 24px;
           }
         }
 
@@ -807,7 +799,7 @@ export default function Dashboard() {
           display: flex;
           flex-direction: column;
           gap: 20px;
-          margin-bottom: 24px;
+          margin-bottom: 20px;
           border: 0.5px solid rgba(255, 255, 255, 0.95);
           width: 100%;
           backdrop-filter: blur(10px);
@@ -819,6 +811,9 @@ export default function Dashboard() {
             flex-direction: row;
             gap: 32px;
             align-items: center;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
           }
         }
 
@@ -959,10 +954,10 @@ export default function Dashboard() {
               </div>
 
               <div className="fb-profile">
-                <div className="fb-profile-avatar">{isGuest ? "👤" : initials}</div>
+                <div className="fb-profile-avatar">MC</div>
                 <div className="fb-profile-info">
-                  <div className="fb-profile-name">{isGuest ? "guest" : fullName}</div>
-                  <div className="fb-profile-action">{isGuest ? "not saved" : "tap for settings"}</div>
+                  <div className="fb-profile-name">Maya Chen</div>
+                  <div className="fb-profile-action">tap for settings</div>
                 </div>
               </div>
 
@@ -1073,7 +1068,7 @@ export default function Dashboard() {
                 </svg>
                 daily check-in
               </div>
-              <h2 className="fb-checkin-heading">how do you feel right now?</h2>
+              <h2 className="fb-checkin-heading">how do you<br />feel right now?</h2>
               <p className="fb-checkin-hint">pick one. nothing shifts unless you're ready.</p>
 
               <div className="fb-moods-grid">

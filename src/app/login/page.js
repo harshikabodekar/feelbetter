@@ -2,26 +2,42 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const router = useRouter()
+  const { signIn, signUp, signInWithGoogle, signInAsGuest, error, setError } = useAuth()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     if (!email || !password) { setError('Please fill in all fields'); return }
     if (isSignUp && !name) { setError('Please enter your name'); return }
-    
-    // Save user info to localStorage
-    if (isSignUp && name) {
-      localStorage.setItem('userName', name)
+
+    setSubmitting(true)
+    if (isSignUp) {
+      const ok = await signUp(email, password, name)
+      if (ok) router.push('/dashboard')
+    } else {
+      const ok = await signIn(email, password)
+      if (ok) router.push('/dashboard')
     }
-    
+    setSubmitting(false)
+  }
+
+  const handleGoogle = async () => {
+    setError('')
+    await signInWithGoogle()
+    // signInWithGoogle redirects automatically — no router.push needed
+  }
+
+  const handleGuest = () => {
+    signInAsGuest()
     router.push('/dashboard')
   }
 
@@ -249,16 +265,17 @@ export default function LoginPage() {
             )}
 
             {/* sign in button */}
-            <button onClick={handleSubmit} style={{
+            <button onClick={handleSubmit} disabled={submitting} style={{
               width: '100%', padding: '1rem',
               background: 'linear-gradient(135deg, #0e8fa3 0%, #06527a 100%)',
               color: '#e8f8f9', border: '1px solid rgba(168,230,232,0.4)',
               borderRadius: '12px', fontSize: '1rem', fontWeight: '700',
-              letterSpacing: '0.08em', cursor: 'pointer',
+              letterSpacing: '0.08em', cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.7 : 1,
               boxShadow: '0 4px 20px rgba(14,143,163,0.35)',
               marginBottom: '14px', fontFamily: 'Georgia, serif',
             }}>
-              {isSignUp ? 'Create Account' : 'Sign In'} →
+              {submitting ? '...' : (isSignUp ? 'Create Account' : 'Sign In') + ' →'}
             </button>
 
             {/* divider */}
@@ -272,7 +289,7 @@ export default function LoginPage() {
             </div>
 
             {/* google */}
-            <button style={{
+            <button onClick={handleGoogle} style={{
               width: '100%', padding: '0.9rem',
               background: 'rgba(255,255,255,0.07)',
               color: '#e8f8f9', border: '1px solid rgba(168,230,232,0.3)',
@@ -291,10 +308,7 @@ export default function LoginPage() {
             </button>
 
             {/* guest */}
-            <button onClick={() => {
-              localStorage.setItem('userName', 'Guest')
-              router.push('/dashboard')
-            }} style={{
+            <button onClick={handleGuest} style={{
               width: '100%', padding: '0.9rem',
               background: 'transparent',
               color: 'rgba(232,248,249,0.55)',

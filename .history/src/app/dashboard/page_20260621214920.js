@@ -1,7 +1,5 @@
 "use client"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/context/AuthContext"
 
 const MOODS = [
   { id: "empty", label: "empty", color: "#515d6e", textColor: "#ffffff" },
@@ -60,9 +58,6 @@ function getSubGreeting() {
 }
 
 export default function Dashboard() {
-  const router = useRouter()
-  const { user, loading, signOut } = useAuth()
-
   const [clock, setClock] = useState(getClock())
   const [activeMood, setActiveMood] = useState(null)
   const [breatheText, setBreatheText] = useState("tap to begin a 4·7·8 cycle")
@@ -70,16 +65,6 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [anonymousMode, setAnonymousMode] = useState(false)
-  const [isGuest, setIsGuest] = useState(false)
-
-  useEffect(() => {
-    const guest = localStorage.getItem('isGuest') === 'true'
-    setIsGuest(guest)
-
-    if (!loading && !user && !guest) {
-      router.replace('/login')
-    }
-  }, [user, loading])
 
   useEffect(() => {
     const t = setInterval(() => setClock(getClock()), 30000)
@@ -91,16 +76,6 @@ export default function Dashboard() {
       window.removeEventListener("resize", handleResize)
     }
   }, [])
-
-  const handleLogout = async () => {
-    await signOut()
-    router.push('/login')
-  }
-
-  // Derive display name: real user → guest → fallback
-  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there'
-  const firstName = fullName.split(' ')[0]
-  const initials = fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
   function startBreathe() {
     if (breatheActive) return
@@ -959,10 +934,10 @@ export default function Dashboard() {
               </div>
 
               <div className="fb-profile">
-                <div className="fb-profile-avatar">{isGuest ? "👤" : initials}</div>
+                <div className="fb-profile-avatar">MC</div>
                 <div className="fb-profile-info">
-                  <div className="fb-profile-name">{isGuest ? "guest" : fullName}</div>
-                  <div className="fb-profile-action">{isGuest ? "not saved" : "tap for settings"}</div>
+                  <div className="fb-profile-name">Maya Chen</div>
+                  <div className="fb-profile-action">tap for settings</div>
                 </div>
               </div>
 
