@@ -71,8 +71,6 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [anonymousMode, setAnonymousMode] = useState(false)
-  const [displayedAnonMode, setDisplayedAnonMode] = useState(false)
-  const [toggleAnimation, setToggleAnimation] = useState('idle')
   const [isGuest, setIsGuest] = useState(false)
   const [moodHistory, setMoodHistory] = useState([])
 
@@ -117,18 +115,6 @@ export default function Dashboard() {
       window.removeEventListener("resize", handleResize)
     }
   }, [])
-
-  const handleAnonToggle = () => {
-    if (toggleAnimation !== 'idle') return
-    const entering = !anonymousMode
-    setAnonymousMode(entering)
-    setToggleAnimation('leaving')
-    setTimeout(() => {
-      setDisplayedAnonMode(entering)
-      setToggleAnimation('arriving')
-      setTimeout(() => setToggleAnimation('idle'), 2400)
-    }, 1300)
-  }
 
   const handleLogout = async () => {
     await signOut()
@@ -755,35 +741,6 @@ export default function Dashboard() {
           50% { transform: scale(1.08); }
         }
 
-        @keyframes fb-soul-leave {
-          0%   { opacity: 1; transform: scale(1) translateY(0);    filter: blur(0px)  brightness(1); }
-          20%  { opacity: 0.9; transform: scale(1.03) translateY(-3px); filter: blur(0.5px) brightness(1.1); }
-          100% { opacity: 0; transform: scale(1.14) translateY(-14px); filter: blur(14px) brightness(2.2); }
-        }
-
-        @keyframes fb-soul-arrive {
-          0%   { opacity: 0; transform: scale(0.8) translateY(12px);  filter: blur(16px) brightness(0.4); }
-          35%  { opacity: 0.35; transform: scale(0.95) translateY(-3px); filter: blur(7px)  brightness(0.85); }
-          70%  { opacity: 0.8; transform: scale(1.02) translateY(-1px); filter: blur(2px)  brightness(1.05); }
-          100% { opacity: 1; transform: scale(1) translateY(0);    filter: blur(0)    brightness(1); }
-        }
-
-        @keyframes fb-name-leave {
-          0%   { opacity: 1; transform: translateY(0);   filter: blur(0);   letter-spacing: normal; }
-          100% { opacity: 0; transform: translateY(-5px); filter: blur(10px); letter-spacing: 0.35em; }
-        }
-
-        @keyframes fb-name-arrive {
-          0%   { opacity: 0; transform: translateY(6px);  filter: blur(12px); letter-spacing: 0.45em; }
-          50%  { opacity: 0.5; transform: translateY(-1px); filter: blur(4px);  letter-spacing: 0.08em; }
-          100% { opacity: 1; transform: translateY(0);   filter: blur(0);    letter-spacing: normal; }
-        }
-
-        @keyframes fb-star-breathe {
-          0%, 100% { filter: drop-shadow(0 0 2px rgba(255,255,255,0.25)) brightness(1); }
-          50%       { filter: drop-shadow(0 0 9px rgba(255,255,255,0.75)) brightness(1.45); }
-        }
-
         .fb-breathe-label {
           font-size: 11px;
           letter-spacing: 3px;
@@ -1007,9 +964,7 @@ export default function Dashboard() {
 
           /* ── Navbar ── */
           .fb-time {
-            font-size: 22px;
-            color: #0f2e35;
-            font-weight: 600;
+            font-size: 18px;
           }
 
           /* ── Greeting ── */
@@ -1091,28 +1046,26 @@ export default function Dashboard() {
 
           /* ── Whisper card ── */
           .fb-whisper-card {
-            padding: 40px 56px;
-            gap: 32px;
+            padding: 32px 48px;
+            gap: 24px;
             margin-bottom: 32px;
-            min-height: 220px;
-            align-items: center;
           }
           .fb-whisper-icon {
-            width: 80px;
-            height: 80px;
-            border-radius: 22px;
+            width: 64px;
+            height: 64px;
+            border-radius: 18px;
           }
           .fb-whisper-label {
             font-size: 13px;
             letter-spacing: 2.5px;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
           }
           .fb-whisper-desc {
-            font-size: 24px;
+            font-size: 20px;
           }
           .fb-open-btn {
-            padding: 16px 48px;
-            font-size: 19px;
+            padding: 12px 32px;
+            font-size: 16px;
           }
 
           /* ── Wind-down card ── */
@@ -1147,8 +1100,8 @@ export default function Dashboard() {
 
           /* ── Footer ── */
           .fb-footer {
-            font-size: 22px;
-            padding: 36px 72px 60px;
+            font-size: 17px;
+            padding: 28px 72px 52px;
           }
         }
       `}</style>
@@ -1193,36 +1146,9 @@ export default function Dashboard() {
               <div className="fb-sidebar-brand">feelbetter</div>
 
               <div className="fb-profile">
-                <div
-                  className="fb-profile-avatar"
-                  style={{
-                    animation:
-                      toggleAnimation === 'leaving'  ? 'fb-soul-leave 1.3s ease-in forwards' :
-                      toggleAnimation === 'arriving' ? 'fb-soul-arrive 2.4s cubic-bezier(0.23, 1, 0.32, 1) forwards' :
-                      'none'
-                  }}
-                >
-                  {displayedAnonMode ? (
-                    <svg
-                      viewBox="0 0 24 24" width="26" height="26" fill="white" stroke="none"
-                      style={{ animation: toggleAnimation === 'idle' ? 'fb-star-breathe 4s ease-in-out infinite' : 'none' }}
-                    >
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  ) : isGuest ? "👤" : initials}
-                </div>
+                <div className="fb-profile-avatar">{isGuest ? "👤" : initials}</div>
                 <div className="fb-profile-info">
-                  <div
-                    className="fb-profile-name"
-                    style={{
-                      animation:
-                        toggleAnimation === 'leaving'  ? 'fb-name-leave 0.9s ease-in forwards' :
-                        toggleAnimation === 'arriving' ? 'fb-name-arrive 2s cubic-bezier(0.23, 1, 0.32, 1) 0.4s forwards' :
-                        'none'
-                    }}
-                  >
-                    {displayedAnonMode ? "soul" : isGuest ? "guest" : fullName}
-                  </div>
+                  <div className="fb-profile-name">{isGuest ? "guest" : fullName}</div>
                   <div className="fb-profile-action">{isGuest ? "not saved" : "tap for settings"}</div>
                 </div>
               </div>
@@ -1238,7 +1164,7 @@ export default function Dashboard() {
                 <label className="fb-anon-label">anonymous mode</label>
                 <button 
                   className={`fb-toggle ${anonymousMode ? "on" : ""}`}
-                  onClick={handleAnonToggle}
+                  onClick={() => setAnonymousMode(!anonymousMode)}
                 >
                   <div className="fb-toggle-thumb" />
                 </button>
@@ -1315,7 +1241,7 @@ export default function Dashboard() {
 
             <div className="fb-sidebar-bottom">
               <div className="fb-logout" onClick={handleLogout} style={{ cursor: 'pointer' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="1.5">
                   <path d="M10 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4M16 17l5-5m0 0l-5-5" />
                 </svg>
