@@ -162,7 +162,7 @@ export default function Dashboard() {
         @media (min-width: 1024px) {
           .fb-sidebar {
             display: flex;
-            width: 320px;
+            width: 380px;
           }
         }
 
@@ -194,7 +194,7 @@ export default function Dashboard() {
         }
 
         .fb-sidebar-top {
-          padding: 24px;
+          padding: 28px;
           border-bottom: 1px solid rgba(0, 0, 0, 0.08);
           flex-shrink: 0;
         }
@@ -231,15 +231,15 @@ export default function Dashboard() {
         }
 
         .fb-profile-avatar {
-          width: 50px;
-          height: 50px;
+          width: 56px;
+          height: 56px;
           border-radius: 50%;
           background: linear-gradient(135deg, #7ac4d0, #5aaabb);
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
-          font-size: 15px;
+          font-size: 18px;
           font-weight: 600;
           flex-shrink: 0;
         }
@@ -249,7 +249,7 @@ export default function Dashboard() {
         }
 
         .fb-profile-name {
-          font-size: 16px;
+          font-size: 18px;
           color: #0f2e35;
           font-weight: 500;
         }
@@ -317,7 +317,7 @@ export default function Dashboard() {
 
         .fb-sidebar-middle {
           flex: 1;
-          padding: 0 24px;
+          padding: 0 28px;
           overflow-y: auto;
         }
 
@@ -326,7 +326,7 @@ export default function Dashboard() {
         }
 
         .fb-sidebar-section-label {
-          font-size: 12px;
+          font-size: 13px;
           letter-spacing: 1.5px;
           text-transform: uppercase;
           color: #4a8a96;
@@ -363,7 +363,7 @@ export default function Dashboard() {
           background: rgba(255, 255, 255, 0.5);
           border-radius: 8px;
           cursor: pointer;
-          font-size: 15px;
+          font-size: 16px;
           color: #1a3a42;
         }
 
@@ -377,27 +377,27 @@ export default function Dashboard() {
         }
 
         .fb-sound-selector {
-          font-size: 15px;
+          font-size: 16px;
           color: #1a3a42;
           cursor: pointer;
           padding: 10px 0;
         }
 
         .fb-settings-item {
-          font-size: 15px;
+          font-size: 16px;
           color: #1a3a42;
           cursor: pointer;
           padding: 10px 0;
         }
 
         .fb-sidebar-bottom {
-          padding: 24px;
+          padding: 28px;
           border-top: 1px solid rgba(0, 0, 0, 0.08);
           flex-shrink: 0;
         }
 
         .fb-logout {
-          font-size: 15px;
+          font-size: 16px;
           color: #4a8a96;
           cursor: pointer;
           display: flex;
@@ -575,21 +575,20 @@ export default function Dashboard() {
           margin-bottom: 28px;
         }
 
-        /* MOOD BLOBS - 3 on top, 2 on bottom */
+        /* MOOD BLOBS */
         .fb-moods-grid {
           display: flex;
           flex-wrap: wrap;
-          gap: 16px;
+          gap: 20px;
           justify-content: center;
         }
 
         @media (min-width: 768px) {
           .fb-moods-grid {
-            gap: 20px;
+            gap: 24px;
           }
         }
 
-        /* First 3 blobs take 1/3 width each, last 2 blobs centered on second row */
         .fb-mood-btn {
           border: none;
           background: none;
@@ -603,28 +602,16 @@ export default function Dashboard() {
           padding: 0;
           border-radius: 50%;
           position: relative;
-          width: 120px;
+          width: 130px;
           height: 120px;
+          flex-shrink: 0;
         }
 
         @media (min-width: 768px) {
           .fb-mood-btn {
-            width: 150px;
-            height: 150px;
+            width: 160px;
+            height: 140px;
           }
-        }
-
-        /* First 3 blobs: flex-basis 33% to force 3 per row */
-        .fb-mood-btn:nth-child(1),
-        .fb-mood-btn:nth-child(2),
-        .fb-mood-btn:nth-child(3) {
-          flex-basis: 33.333%;
-        }
-
-        /* Last 2 blobs: flex-basis for 2 on next row, centered */
-        .fb-mood-btn:nth-child(4),
-        .fb-mood-btn:nth-child(5) {
-          flex-basis: 50%;
         }
 
         .fb-mood-btn:hover {
@@ -920,6 +907,28 @@ export default function Dashboard() {
             font-size: 15px;
           }
         }
+
+        @media (min-width: 1024px) {
+          /* Fixed blob sizes — no stretching */
+          .fb-mood-btn {
+            width: 160px;
+            height: 140px;
+            flex-shrink: 0;
+          }
+
+          /* 3-2 layout: max-width forces 3 per row, justify-content centers both rows */
+          .fb-moods-grid {
+            max-width: 560px;
+            gap: 24px;
+            justify-content: center;
+            flex-wrap: wrap;
+          }
+
+          /* Right margin on 4th blob spreads the bottom 2 blobs while keeping them centered */
+          .fb-mood-btn:nth-child(4) {
+            margin-right: 100px;
+          }
+        }
       `}</style>
 
       <div className="fb-root">
@@ -1049,19 +1058,19 @@ export default function Dashboard() {
             </div>
 
             <div className="fb-sidebar-bottom">
-              <div className="fb-logout">
+              <div className="fb-logout" onClick={handleLogout} style={{ cursor: 'pointer' }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="1.5">
                   <path d="M10 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4M16 17l5-5m0 0l-5-5" />
                 </svg>
-                logout
+                {isGuest ? "sign in" : "logout"}
               </div>
             </div>
           </aside>
 
           {/* main content */}
           <div className="fb-main">
-            <p className="fb-greeting">{anonymousMode ? "hello there," : "hello Maya,"}</p>
+            <p className="fb-greeting">{anonymousMode ? "hello there," : `hello ${firstName},`}</p>
             <p className="fb-subgreeting">{getSubGreeting()}</p>
 
             {/* DAILY CHECK-IN CARD */}
