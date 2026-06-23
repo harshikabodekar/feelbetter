@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
@@ -10,6 +10,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1024)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
   const router = useRouter()
   const { signIn, signUp, signInWithGoogle, signInAsGuest, error, setError } = useAuth()
 
@@ -43,10 +51,10 @@ export default function LoginPage() {
 
   const inputStyle = {
     width: '100%',
-    padding: '0.9rem 1rem',
+    padding: isDesktop ? '1.2rem 1.3rem' : '0.9rem 1rem',
     border: '1px solid rgba(168, 230, 232, 0.4)',
     borderRadius: '12px',
-    fontSize: '1rem',
+    fontSize: isDesktop ? '1.15rem' : '1rem',
     boxSizing: 'border-box',
     fontFamily: 'Georgia, serif',
     background: 'rgba(255, 255, 255, 0.07)',
@@ -59,7 +67,7 @@ export default function LoginPage() {
     display: 'block',
     marginBottom: '0.5rem',
     color: 'rgba(232, 248, 249, 0.7)',
-    fontSize: '0.85rem',
+    fontSize: isDesktop ? '1rem' : '0.85rem',
     fontWeight: '600',
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
@@ -115,8 +123,8 @@ export default function LoginPage() {
         border: '1px solid rgba(255, 255, 255, 0.18)',
         borderRadius: '32px',
         width: '100%',
-        maxWidth: '1020px',
-        minHeight: '580px',
+        maxWidth: isDesktop ? '1360px' : '1020px',
+        minHeight: isDesktop ? '740px' : '580px',
         boxShadow: '0 8px 48px rgba(3, 33, 74, 0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
         position: 'relative',
         zIndex: 10,
@@ -130,25 +138,25 @@ export default function LoginPage() {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          padding: '60px 50px',
+          padding: isDesktop ? '80px 70px' : '60px 50px',
           borderRight: '1px solid rgba(168, 230, 232, 0.15)',
           position: 'relative',
         }}>
 
           {/* logo */}
           <div style={{ marginBottom: '40px', textAlign: 'left' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '12px', letterSpacing: '0.3em' }}>
+            <div style={{ fontSize: isDesktop ? '2.6rem' : '2rem', marginBottom: '12px', letterSpacing: '0.3em' }}>
               𓆝 𓆟 𓆞 𓆝 𓆟
             </div>
             <h2 style={{
-              color: '#e8f8f9', fontSize: '3rem', fontWeight: '700',
+              color: '#e8f8f9', fontSize: isDesktop ? '3.8rem' : '3rem', fontWeight: '700',
               margin: 0, letterSpacing: '0.1em',
             }}>feelbetter</h2>
           </div>
 
           {/* big quote */}
           <h1 style={{
-            fontSize: '2.93rem',
+            fontSize: isDesktop ? '3.7rem' : '2.93rem',
             color: '#e8f8f9',
             fontWeight: '700',
             lineHeight: '1.35',
@@ -163,7 +171,7 @@ export default function LoginPage() {
 
           <p style={{
             color: 'rgba(232,248,249,0.65)',
-            fontSize: '1.75rem',
+            fontSize: isDesktop ? '2.1rem' : '1.75rem',
             lineHeight: '1.7',
             margin: '0 0 40px 0',
             letterSpacing: '0.02em',
@@ -185,9 +193,9 @@ export default function LoginPage() {
 
           {/* bottom tag */}
           <p style={{
-            position: 'absolute', bottom: '32px', left: '50px',
+            position: 'absolute', bottom: '32px', left: isDesktop ? '70px' : '50px',
             color: 'darkcyan',
-            fontSize: '1.25rem', letterSpacing: '0.2em',
+            fontSize: isDesktop ? '1.5rem' : '1.25rem', letterSpacing: '0.2em',
             textTransform: 'uppercase', margin: 0,
           }}>
             breathe · feel · heal
@@ -200,12 +208,12 @@ export default function LoginPage() {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          padding: '60px 50px',
+          padding: isDesktop ? '80px 70px' : '60px 50px',
         }}>
 
           <h2 style={{
             color: '#e8f8f9',
-            fontSize: '1.8rem',
+            fontSize: isDesktop ? '2.4rem' : '1.8rem',
             fontWeight: '700',
             margin: '0 0 6px 0',
             letterSpacing: '0.04em',
@@ -214,7 +222,7 @@ export default function LoginPage() {
           </h2>
           <p style={{
             color: 'rgba(232,248,249,0.55)',
-            fontSize: '1.1rem',
+            fontSize: isDesktop ? '1.4rem' : '1.1rem',
             margin: '0 0 32px 0',
             letterSpacing: '0.03em',
           }}>
@@ -266,10 +274,10 @@ export default function LoginPage() {
 
             {/* sign in button */}
             <button onClick={handleSubmit} disabled={submitting} style={{
-              width: '100%', padding: '1rem',
+              width: '100%', padding: isDesktop ? '1.3rem' : '1rem',
               background: 'linear-gradient(135deg, #0e8fa3 0%, #06527a 100%)',
               color: '#e8f8f9', border: '1px solid rgba(168,230,232,0.4)',
-              borderRadius: '12px', fontSize: '1rem', fontWeight: '700',
+              borderRadius: '12px', fontSize: isDesktop ? '1.2rem' : '1rem', fontWeight: '700',
               letterSpacing: '0.08em', cursor: submitting ? 'not-allowed' : 'pointer',
               opacity: submitting ? 0.7 : 1,
               boxShadow: '0 4px 20px rgba(14,143,163,0.35)',
@@ -290,10 +298,10 @@ export default function LoginPage() {
 
             {/* google */}
             <button onClick={handleGoogle} style={{
-              width: '100%', padding: '0.9rem',
+              width: '100%', padding: isDesktop ? '1.1rem' : '0.9rem',
               background: 'rgba(255,255,255,0.07)',
               color: '#e8f8f9', border: '1px solid rgba(168,230,232,0.3)',
-              borderRadius: '12px', fontSize: '1rem', fontWeight: '600',
+              borderRadius: '12px', fontSize: isDesktop ? '1.15rem' : '1rem', fontWeight: '600',
               letterSpacing: '0.05em', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               gap: '10px', marginBottom: '12px', fontFamily: 'Georgia, serif',
@@ -309,11 +317,11 @@ export default function LoginPage() {
 
             {/* guest */}
             <button onClick={handleGuest} style={{
-              width: '100%', padding: '0.9rem',
+              width: '100%', padding: isDesktop ? '1.1rem' : '0.9rem',
               background: 'transparent',
               color: 'rgba(232,248,249,0.55)',
               border: '1px solid rgba(168,230,232,0.15)',
-              borderRadius: '12px', fontSize: '1rem', fontWeight: '600',
+              borderRadius: '12px', fontSize: isDesktop ? '1.15rem' : '1rem', fontWeight: '600',
               letterSpacing: '0.05em', cursor: 'pointer',
               fontFamily: 'Georgia, serif',
             }}>

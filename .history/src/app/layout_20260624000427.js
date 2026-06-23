@@ -25,4 +25,4 @@ export default function RootLayout({ children }) {
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable}`}>
       <body className="font-sans antialiased">{children}</body>
     </html>
-  );}
+  ); 
