@@ -1,453 +1,1207 @@
-"use client"; // this page has state, timers and click handlers → client component
+"use client"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/context/AuthContext"
 
-import { useEffect, useState } from "react";
+const MOODS = [
+  { id: "empty", label: "empty", color: "#515d6e", textColor: "#ffffff" },
+  { id: "overwhelmed", label: "overwhelmed", color: "#0a6878", textColor: "#ffffff" },
+  { id: "okayish", label: "okay-ish", color: "#7a8a5a", textColor: "#ffffff" },
+  { id: "heavy", label: "heavy", color: "#1a1060", textColor: "#ffffff" },
+  { id: "full", label: "full", color: "#d07030", textColor: "#ffffff" },
+]
 
-/* ------------------------------------------------------------------ */
-/*  MOOD DATA                                                          */
-/*  Each mood has two states:                                          */
-/*    s1 = "I see you"  (mirrors the feeling)                          */
-/*    s2 = "I've got you" (gently shifts to something healing)         */
-/*  blob/radius/pos describe the organic card on the dashboard.        */
-/* ------------------------------------------------------------------ */
-const MOODS = {
-  empty: {
-    icon: "empty",
-    blob: "linear-gradient(155deg,#94a4af,#c6d4dc)",
-    radius: "47% 53% 68% 32% / 62% 44% 56% 38%",
-    accentDot: "#8a96a3", // used for the sidebar "jump to a feeling" swatch
-    pos: { left: 8, top: 62, w: 248, h: 258 },
-    s1: { bg: "linear-gradient(180deg,#b8c2cc 0%,#d6dce0 100%)", fg: "#3a4651", accent: "#8a96a3", head: "it's okay to feel nothing right now.", sub: "no task. no fixing. just sit here with the quiet." },
-    s2: { bg: "linear-gradient(180deg,#e8dfc9 0%,#f5ecd7 100%)", fg: "#5b4a32", accent: "#c9a96b", head: "something is still here. you are still here.", sub: "warmth seeps in, slowly. nothing to chase. nothing to prove." },
-  },
-  overwhelmed: {
-    icon: "wave",
-    blob: "linear-gradient(150deg,#0c6b7a,#1c95a8)",
-    radius: "58% 42% 56% 44% / 56% 50% 50% 44%",
-    accentDot: "#5eb4c2",
-    pos: { left: 300, top: 24, w: 402, h: 268 },
-    s1: { bg: "linear-gradient(180deg,#0d4f5c 0%,#1a6b78 100%)", fg: "#e8f4f6", accent: "#5eb4c2", head: "one thing at a time.", sub: "the weight is real. but you don't have to lift it all at once." },
-    s2: { bg: "linear-gradient(180deg,#b8e0d4 0%,#d8eee5 100%)", fg: "#2d4a45", accent: "#5fa896", head: "one breath. one thing. you've got this.", sub: "the screen exhales with you. the room widens." },
-  },
-  okayish: {
-    icon: "suncloud",
-    blob: "linear-gradient(150deg,#7e8d60,#aebb8a)",
-    radius: "52% 48% 60% 40% / 58% 46% 54% 42%",
-    accentDot: "#7a8a6f",
-    pos: { left: 318, top: 316, w: 252, h: 154 },
-    s1: { bg: "linear-gradient(180deg,#a8a89c 0%,#c2c2b4 100%)", fg: "#3f3f36", accent: "#7a8a6f", head: "an overcast kind of afternoon.", sub: "not bad. not bright. just here, and that's enough." },
-    s2: { bg: "linear-gradient(180deg,#f5c98f 0%,#fbdcb0 60%,#ffe6c4 100%)", fg: "#5a3b1a", accent: "#e09650", head: "the clouds are parting.", sub: "golden hour finds you. a little amber, a little peach." },
-  },
-  heavy: {
-    icon: "drop",
-    blob: "linear-gradient(160deg,#241a5e,#5044a0)",
-    radius: "50% 50% 50% 50% / 64% 60% 40% 36%",
-    accentDot: "#6b5fa3",
-    pos: { left: 24, top: 340, w: 276, h: 236 },
-    s1: { bg: "linear-gradient(180deg,#1e1b3a 0%,#2d2655 100%)", fg: "#dcd6f0", accent: "#6b5fa3", head: "cold, still, underwater.", sub: "stay as long as you need. nothing here is asking anything of you." },
-    s2: { bg: "linear-gradient(0deg,#d4869a 0%,#a37396 40%,#574a78 100%)", fg: "#fff0f0", accent: "#e8a8b8", head: "you've carried this long enough. set it down for a moment.", sub: "warm light glows from below. the cold loosens its grip." },
-  },
-  full: {
-    icon: "flower",
-    blob: "linear-gradient(150deg,#e08a3c,#f6cc8c)",
-    radius: "56% 44% 52% 48% / 52% 56% 44% 48%",
-    accentDot: "#1f8aa3",
-    pos: { left: 588, top: 302, w: 316, h: 222 },
-    s1: { bg: "linear-gradient(180deg,#7ed4e6 0%,#b5e8f0 100%)", fg: "#0f3a4a", accent: "#1f8aa3", head: "light and alive.", sub: "bright aqua, open sky. let it spill into everything you do today." },
-    s2: { bg: "linear-gradient(135deg,#FFD93D 0%,#FFB347 50%,#FF6B6B 100%)", fg: "#3d1a0d", accent: "#FF6B6B", head: "golden hour, exploding.", sub: "hold this close. you are allowed to be this full." },
-  },
-};
-
-const MOOD_KEYS = ["empty", "overwhelmed", "okayish", "heavy", "full"];
-const LABELS = { empty: "empty", overwhelmed: "overwhelmed", okayish: "okay-ish", heavy: "heavy", full: "full" };
-
-/* ------------------------------------------------------------------ */
-/*  Tiny inline SVG icons (kept simple on purpose). `currentColor`     */
-/*  means the icon color = the parent element's text color.            */
-/* ------------------------------------------------------------------ */
-function MoodIcon({ name, size = 76 }) {
-  const common = { width: size, height: size, viewBox: "0 0 48 48", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
-  if (name === "empty")
-    return (
-      <svg {...common}>
-        <circle cx="24" cy="15" r="6" />
-        <circle cx="24" cy="15" r="1.5" fill="currentColor" stroke="none" />
-        <path d="M7 30c4-4 7.5-4 11.5 0s7.5 4 11.5 0 7.5-4 11-1.5" />
-        <path d="M7 37c4-4 7.5-4 11.5 0s7.5 4 11.5 0 7.5-4 11-1.5" />
-      </svg>
-    );
-  if (name === "wave")
-    return (
-      <svg {...common} strokeWidth={2.4}>
-        <path d="M6 18c4.5-6 9-6 13.5 0s9 6 13.5 0 4.5-6 9-3" />
-        <path d="M6 30c4.5-6 9-6 13.5 0s9 6 13.5 0 4.5-6 9-3" />
-        <circle cx="22" cy="24" r="1.9" fill="currentColor" stroke="none" />
-      </svg>
-    );
-  if (name === "suncloud")
-    return (
-      <svg {...common}>
-        <circle cx="22" cy="18" r="6.5" />
-        <path d="M22 5.5v-2.5M10 18H7.5M34 18h2.5M13.6 9.6l-1.8-1.8M30.4 9.6l1.8-1.8" />
-        <path d="M11 36c0-6.2 5-10.5 11.5-10.5S34 29.8 34 36z" fill="currentColor" stroke="none" />
-      </svg>
-    );
-  if (name === "drop")
-    return (
-      <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-        <path d="M24 7s-10 11-10 18a10 10 0 0 0 20 0c0-7-10-18-10-18z" fill="currentColor" />
-        <ellipse cx="24" cy="37" rx="12" ry="3.2" fill="none" stroke="currentColor" strokeWidth="2" opacity=".5" />
-      </svg>
-    );
-  // flower (6 petals + rays)
-  return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-      <g fill="currentColor">
-        {[0, 60, 120, 180, 240, 300].map((deg) => (
-          <ellipse key={deg} cx="24" cy="13" rx="4.6" ry="9" transform={`rotate(${deg} 24 24)`} />
-        ))}
-      </g>
-      <g stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-        {[30, 90, 150, 210, 270, 330].map((deg) => (
-          <line key={deg} x1="24" y1="6" x2="24" y2="2.5" transform={`rotate(${deg} 24 24)`} />
-        ))}
-      </g>
-      <circle cx="24" cy="24" r="3" fill="#fff" opacity=".5" />
-    </svg>
-  );
+const BG_MAP = {
+  default:     "linear-gradient(135deg, #a8d8e0 0%, #b8e4ec 25%, #caeef5 75%, #ddf5f9 100%)",
+  empty:       "linear-gradient(135deg, #8a9aa8 0%, #ccd8e0 100%)",
+  overwhelmed: "linear-gradient(135deg, #0a6878 0%, #a8dce8 100%)",
+  okayish:     "linear-gradient(135deg, #7a8a5a 0%, #c8d8a8 100%)",
+  heavy:       "linear-gradient(135deg, #1a1060 0%, #a8a0d8 100%)",
+  full:        "linear-gradient(135deg, #d07030 0%, #f8c890 100%)",
 }
 
-/* ------------------------------------------------------------------ */
-/*  DASHBOARD PAGE                                                     */
-/* ------------------------------------------------------------------ */
+const FOOTER_MAP = {
+  default:     "not feeling is also a feeling. you are still here.",
+  empty:       "not feeling is also a feeling. you are still here.",
+  overwhelmed: "you don't have to solve everything tonight.",
+  okayish:     "ordinary days are still days worth living.",
+  heavy:       "you are allowed to fall apart sometimes. it doesn't make you broken.",
+  full:        "hold this feeling close. you deserve this.",
+}
+
+const BREATHE_STEPS = [
+  { text: "breathe in... 4", ms: 4000 },
+  { text: "hold... 7",       ms: 7000 },
+  { text: "breathe out... 8", ms: 8000 },
+]
+
+const MOOD_COLORS = {
+  empty:       "#8a9aa8",
+  overwhelmed: "#0a6878",
+  okayish:     "#7a8a5a",
+  heavy:       "#1a1060",
+  full:        "#d07030",
+}
+
+function getClock() {
+  const now = new Date()
+  let h = now.getHours(), m = now.getMinutes()
+  const ampm = h >= 12 ? "pm" : "am"
+  h = h % 12 || 12
+  return `it's ${h}:${m < 10 ? "0" + m : m}${ampm}`
+}
+
+function getSubGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return "how are you waking up today?"
+  if (h < 17) return "how's the middle of the day treating you?"
+  if (h < 22) return "how is your heart settling today?"
+  return "it's quiet out there. how are you doing?"
+}
+
 export default function Dashboard() {
-  const [now, setNow] = useState("it's 7:05pm");
-  const [sub, setSub] = useState("how is your heart settling today?");
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [anon, setAnon] = useState(false);
-  const [breathing, setBreathing] = useState(false);
+  const router = useRouter()
+  const { user, loading, signOut } = useAuth()
 
-  // null = dashboard view; otherwise we show that mood's full-screen experience
-  const [moodKey, setMoodKey] = useState(null);
-  const [moodState, setMoodState] = useState(1); // 1 = "I see you", 2 = "I've got you"
+  const [clock, setClock] = useState(getClock())
+  const [activeMood, setActiveMood] = useState(null)
+  const [breatheText, setBreatheText] = useState("tap to begin a 4·7·8 cycle")
+  const [breatheActive, setBreatheActive] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
+  const [anonymousMode, setAnonymousMode] = useState(false)
+  const [isGuest, setIsGuest] = useState(false)
 
-  // Live clock + time-aware sub-greeting, refreshed every 30s
   useEffect(() => {
-    function tick() {
-      const d = new Date();
-      let h = d.getHours();
-      const m = d.getMinutes();
-      const ap = h >= 12 ? "pm" : "am";
-      let hh = h % 12;
-      if (hh === 0) hh = 12;
-      setNow(`it's ${hh}:${String(m).padStart(2, "0")}${ap}`);
+    const guest = localStorage.getItem('isGuest') === 'true'
+    setIsGuest(guest)
 
-      const tod = h < 12 ? "morning" : h < 17 ? "afternoon" : h < 23 ? "evening" : "late";
-      const subs = {
-        morning: "how are you waking up today?",
-        afternoon: "how's the middle of the day treating you?",
-        evening: "how is your heart settling today?",
-        late: "it's quiet out there — how are you doing?",
-      };
-      setSub(subs[tod]);
+    if (!loading && !user && !guest) {
+      router.replace('/login')
     }
-    tick();
-    const id = setInterval(tick, 30000);
-    return () => clearInterval(id);
-  }, []);
+  }, [user, loading])
 
-  // Anonymous mode swaps the name everywhere → "a soul"
-  const name = anon ? "a soul" : "Maya";
-  const fullName = anon ? "a soul" : "Maya Chen";
-  const initials = anon ? "·" : "MC";
+  useEffect(() => {
+    const t = setInterval(() => setClock(getClock()), 30000)
+    setIsDesktop(window.innerWidth >= 1024)
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024)
+    window.addEventListener("resize", handleResize)
+    return () => {
+      clearInterval(t)
+      window.removeEventListener("resize", handleResize)
+    }
+  }, [])
 
-  // Open a mood experience (also closes the drawer if it was open)
-  function openMood(key) {
-    setMoodKey(key);
-    setMoodState(1);
-    setDrawerOpen(false);
+  const handleLogout = async () => {
+    await signOut()
+    router.push('/login')
   }
 
-  // Current mood + active state object (only when a mood is open)
-  const mood = moodKey ? MOODS[moodKey] : null;
-  const st = mood ? (moodState === 1 ? mood.s1 : mood.s2) : null;
+  // Derive display name: real user → guest → fallback
+  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there'
+  const firstName = fullName.split(' ')[0]
+  const initials = fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+
+  function startBreathe() {
+    if (breatheActive) return
+    setBreatheActive(true)
+    let i = 0
+    function next() {
+      if (i >= BREATHE_STEPS.length) {
+        setBreatheText("tap to begin a 4·7·8 cycle")
+        setBreatheActive(false)
+        return
+      }
+      const step = BREATHE_STEPS[i]
+      setBreatheText(step.text)
+      setTimeout(() => { i++; next() }, step.ms)
+    }
+    next()
+  }
+
+  const bg = BG_MAP[activeMood] || BG_MAP.default
+  const footer = FOOTER_MAP[activeMood] || FOOTER_MAP.default
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden font-sans text-[#2f3e45]"
-         style={{ background: "linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%)" }}>
+    <>
+      <style>{`
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
 
-      {/* ===== MAIN CONTENT (dashboard stays default, never tinted) ===== */}
-      <div className="relative z-10 mx-auto max-w-[1180px] px-14 pt-8">
+        .fb-root {
+          font-family: var(--font-dm-sans), sans-serif;
+          background: ${bg};
+          min-height: 100vh;
+          color: #1a3a42;
+          transition: background 0.9s ease;
+          display: flex;
+          flex-direction: column;
+        }
 
+        .fb-wrapper {
+          display: flex;
+          flex: 1;
+          position: relative;
+        }
+
+        /* SIDEBAR */
+        .fb-sidebar {
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(10px);
+          width: 280px;
+          display: none;
+          flex-direction: column;
+          border-right: 1px solid rgba(255, 255, 255, 0.5);
+          position: relative;
+          z-index: 100;
+        }
+
+        @media (min-width: 1024px) {
+          .fb-sidebar {
+            display: flex;
+            width: 380px;
+          }
+        }
+
+        .fb-sidebar-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.4);
+          display: none;
+          z-index: 90;
+        }
+
+        @media (max-width: 1023px) {
+          .fb-sidebar-overlay.open {
+            display: block;
+          }
+
+          .fb-sidebar.open {
+            display: flex;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            z-index: 100;
+          }
+        }
+
+        .fb-sidebar-top {
+          padding: 28px;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+          flex-shrink: 0;
+        }
+
+        .fb-sidebar-close {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 16px;
+        }
+
+        .fb-sidebar-close-btn {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #1a3a42;
+          padding: 0;
+          width: 24px;
+          height: 24px;
+          display: none;
+        }
+
+        @media (max-width: 1023px) {
+          .fb-sidebar-close-btn {
+            display: block;
+          }
+        }
+
+        .fb-profile {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          margin-bottom: 24px;
+        }
+
+        .fb-profile-avatar {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #7ac4d0, #5aaabb);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 18px;
+          font-weight: 600;
+          flex-shrink: 0;
+        }
+
+        .fb-profile-info {
+          flex: 1;
+        }
+
+        .fb-profile-name {
+          font-size: 18px;
+          color: #0f2e35;
+          font-weight: 500;
+        }
+
+        .fb-profile-action {
+          font-size: 13px;
+          color: #4a8a96;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+
+        .fb-anon-toggle {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 14px 0;
+          margin-bottom: 24px;
+        }
+
+        .fb-anon-icon {
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .fb-anon-label {
+          font-size: 15px;
+          color: #1a3a42;
+          flex: 1;
+        }
+
+        .fb-toggle {
+          width: 48px;
+          height: 26px;
+          background: #d0d0d0;
+          border-radius: 13px;
+          border: none;
+          cursor: pointer;
+          position: relative;
+          transition: background 0.3s;
+          flex-shrink: 0;
+        }
+
+        .fb-toggle.on {
+          background: #7ac4d0;
+        }
+
+        .fb-toggle-thumb {
+          position: absolute;
+          top: 3px;
+          left: 3px;
+          width: 20px;
+          height: 20px;
+          background: white;
+          border-radius: 50%;
+          transition: left 0.3s;
+        }
+
+        .fb-toggle.on .fb-toggle-thumb {
+          left: 25px;
+        }
+
+        .fb-sidebar-middle {
+          flex: 1;
+          padding: 0 28px;
+          overflow-y: auto;
+        }
+
+        .fb-sidebar-section {
+          margin-bottom: 28px;
+        }
+
+        .fb-sidebar-section-label {
+          font-size: 13px;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          color: #4a8a96;
+          font-weight: 500;
+          margin-bottom: 14px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .fb-mood-dots {
+          display: flex;
+          gap: 10px;
+        }
+
+        .fb-mood-dot {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #ccc;
+          cursor: pointer;
+          transition: transform 0.2s;
+        }
+
+        .fb-mood-dot:hover {
+          transform: scale(1.15);
+        }
+
+        .fb-history-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px;
+          background: rgba(255, 255, 255, 0.5);
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+          color: #1a3a42;
+        }
+
+        .fb-history-item:hover {
+          background: rgba(255, 255, 255, 0.8);
+        }
+
+        .fb-lock-icon {
+          width: 18px;
+          height: 18px;
+        }
+
+        .fb-sound-selector {
+          font-size: 16px;
+          color: #1a3a42;
+          cursor: pointer;
+          padding: 10px 0;
+        }
+
+        .fb-settings-item {
+          font-size: 16px;
+          color: #1a3a42;
+          cursor: pointer;
+          padding: 10px 0;
+        }
+
+        .fb-sidebar-bottom {
+          padding: 28px;
+          border-top: 1px solid rgba(0, 0, 0, 0.08);
+          flex-shrink: 0;
+        }
+
+        .fb-logout {
+          font-size: 16px;
+          color: #4a8a96;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        /* NAVBAR */
+        .fb-navbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 24px;
+          flex-shrink: 0;
+        }
+
+        @media (min-width: 768px) {
+          .fb-navbar {
+            padding: 24px 48px;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .fb-navbar {
+            padding: 24px 48px;
+          }
+        }
+
+        .fb-logo-wrap {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .fb-hamburger {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          cursor: pointer;
+        }
+
+        @media (min-width: 1024px) {
+          .fb-hamburger {
+            display: none;
+          }
+        }
+
+        .fb-hamburger span {
+          display: block;
+          width: 22px;
+          height: 1.5px;
+          background: #2a5a66;
+          border-radius: 2px;
+        }
+
+        .fb-logo {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-family: var(--font-dm-serif), serif;
+          font-size: 18px;
+          color: #1a3a42;
+          letter-spacing: -0.3px;
+        }
+
+        .fb-time {
+          font-size: 14px;
+          color: #2a5a66;
+          font-weight: 300;
+          font-style: italic;
+        }
+
+        /* MAIN CONTENT */
+        .fb-main {
+          flex: 1;
+          padding: 24px;
+          overflow-y: auto;
+        }
+
+        @media (min-width: 768px) {
+          .fb-main {
+            padding: 32px 48px;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .fb-main {
+            padding: 32px 48px;
+          }
+        }
+
+        .fb-greeting {
+          font-family: var(--font-dm-serif), serif;
+          font-size: 42px;
+          color: #0f2e35;
+          font-weight: 400;
+          line-height: 1.1;
+          margin-bottom: 4px;
+          letter-spacing: -1px;
+        }
+
+        @media (min-width: 768px) {
+          .fb-greeting {
+            font-size: 56px;
+            margin-bottom: 8px;
+            letter-spacing: -1.5px;
+          }
+        }
+
+        .fb-subgreeting {
+          font-size: 16px;
+          color: #3a6a75;
+          font-weight: 300;
+          margin-bottom: 32px;
+        }
+
+        @media (min-width: 768px) {
+          .fb-subgreeting {
+            font-size: 18px;
+            margin-bottom: 40px;
+          }
+        }
+
+        /* DAILY CHECK-IN CARD */
+        .fb-checkin-card {
+          background: rgba(255, 255, 255, 0.65);
+          border-radius: 32px;
+          padding: 32px 24px;
+          border: 0.5px solid rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          margin-bottom: 24px;
+        }
+
+        @media (min-width: 768px) {
+          .fb-checkin-card {
+            padding: 40px 32px;
+            margin-bottom: 28px;
+          }
+        }
+
+        .fb-checkin-label {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: #4a8a96;
+          font-weight: 500;
+          margin-bottom: 12px;
+        }
+
+        .fb-checkin-heading {
+          font-family: var(--font-dm-serif), serif;
+          font-size: 28px;
+          color: #0f2e35;
+          line-height: 1.2;
+          margin-bottom: 12px;
+          font-weight: 400;
+          text-align: left;
+        }
+
+        @media (min-width: 768px) {
+          .fb-checkin-heading {
+            font-size: 32px;
+            margin-bottom: 16px;
+          }
+        }
+
+        .fb-checkin-hint {
+          font-size: 15px;
+          color: #5a8a96;
+          font-weight: 300;
+          font-style: italic;
+          margin-bottom: 28px;
+        }
+
+        /* MOOD BLOBS */
+        .fb-moods-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 20px;
+          justify-content: center;
+        }
+
+        @media (min-width: 768px) {
+          .fb-moods-grid {
+            gap: 24px;
+          }
+        }
+
+        .fb-mood-btn {
+          border: none;
+          background: none;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          transition: transform 0.2s ease, filter 0.2s ease;
+          padding: 0;
+          border-radius: 50%;
+          position: relative;
+          width: 130px;
+          height: 120px;
+          flex-shrink: 0;
+        }
+
+        @media (min-width: 768px) {
+          .fb-mood-btn {
+            width: 160px;
+            height: 140px;
+          }
+        }
+
+        .fb-mood-btn:hover {
+          transform: scale(1.08);
+          filter: brightness(1.1);
+        }
+
+        .fb-mood-btn:focus {
+          outline: 2px solid rgba(255, 255, 255, 0.6);
+          outline-offset: 4px;
+        }
+
+        .fb-mood-icon {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0.9;
+        }
+
+        .fb-mood-label {
+          font-size: 13px;
+          font-weight: 400;
+          letter-spacing: 0.5px;
+          white-space: nowrap;
+        }
+
+        /* BREATHE CARD */
+        .fb-breathe-card {
+          background: rgba(255, 255, 255, 0.65);
+          border-radius: 32px;
+          padding: 40px 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-bottom: 24px;
+          border: 0.5px solid rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          width: 100%;
+        }
+
+        @media (min-width: 768px) {
+          .fb-breathe-card {
+            margin-bottom: 28px;
+          }
+        }
+
+        .fb-breathe-outer {
+          width: 160px;
+          height: 160px;
+          border-radius: 50%;
+          background: rgba(178, 220, 230, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 20px;
+          animation: breathePulse 6s ease-in-out infinite;
+        }
+
+        .fb-breathe-inner {
+          width: 110px;
+          height: 110px;
+          border-radius: 50%;
+          background: linear-gradient(145deg, #6ab4c2, #4a9aac);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: transform 0.2s;
+        }
+
+        .fb-breathe-inner:hover {
+          transform: scale(1.05);
+        }
+
+        @keyframes breathePulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+
+        .fb-breathe-label {
+          font-size: 11px;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          color: #3a7a88;
+          font-weight: 500;
+          margin-bottom: 6px;
+        }
+
+        .fb-breathe-hint {
+          font-size: 16px;
+          color: #4a8a96;
+          font-weight: 300;
+        }
+
+        /* WHISPER CARD */
+        .fb-whisper-card {
+          background: rgba(255, 255, 255, 0.65);
+          border-radius: 32px;
+          padding: 20px 24px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 24px;
+          border: 0.5px solid rgba(255, 255, 255, 0.95);
+          cursor: pointer;
+          width: 100%;
+          backdrop-filter: blur(10px);
+          transition: background 0.2s;
+        }
+
+        @media (min-width: 768px) {
+          .fb-whisper-card {
+            padding: 24px 32px;
+            gap: 20px;
+            margin-bottom: 28px;
+          }
+        }
+
+        .fb-whisper-card:hover {
+          background: rgba(255, 255, 255, 0.82);
+        }
+
+        .fb-whisper-icon {
+          width: 50px;
+          height: 50px;
+          border-radius: 14px;
+          background: rgba(178, 220, 230, 0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        @media (min-width: 768px) {
+          .fb-whisper-icon {
+            width: 54px;
+            height: 54px;
+          }
+        }
+
+        .fb-whisper-label {
+          font-size: 11px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: #4a8a96;
+          font-weight: 500;
+          margin-bottom: 3px;
+        }
+
+        .fb-whisper-desc {
+          font-size: 16px;
+          color: #1a3a42;
+        }
+
+        .fb-open-btn {
+          background: #3a7a88;
+          color: white;
+          border: none;
+          border-radius: 24px;
+          padding: 10px 24px;
+          font-size: 14px;
+          font-family: var(--font-dm-sans), sans-serif;
+          cursor: pointer;
+          white-space: nowrap;
+          margin-left: auto;
+          transition: background 0.2s;
+        }
+
+        .fb-open-btn:hover {
+          background: #2a6070;
+        }
+
+        /* WIND-DOWN CARD */
+        .fb-winddown-card {
+          background: rgba(255, 255, 255, 0.65);
+          border-radius: 32px;
+          padding: 28px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          margin-bottom: 24px;
+          border: 0.5px solid rgba(255, 255, 255, 0.95);
+          width: 100%;
+          backdrop-filter: blur(10px);
+        }
+
+        @media (min-width: 768px) {
+          .fb-winddown-card {
+            padding: 32px 40px;
+            flex-direction: row;
+            gap: 32px;
+            align-items: center;
+          }
+        }
+
+        .fb-winddown-label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: #4a8a96;
+          font-weight: 500;
+          margin-bottom: 8px;
+        }
+
+        .fb-winddown-title {
+          font-family: var(--font-dm-serif), serif;
+          font-size: 24px;
+          color: #0f2e35;
+          margin-bottom: 4px;
+          font-weight: 400;
+        }
+
+        @media (min-width: 768px) {
+          .fb-winddown-title {
+            font-size: 28px;
+          }
+        }
+
+        .fb-winddown-sub {
+          font-size: 14px;
+          color: #5a8a96;
+          margin-bottom: 16px;
+          font-style: italic;
+        }
+
+        .fb-winddown-actions {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .fb-play-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: #1a3a42;
+          color: white;
+          border: none;
+          border-radius: 24px;
+          padding: 10px 22px;
+          font-size: 14px;
+          font-family: var(--font-dm-sans), sans-serif;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .fb-play-btn:hover {
+          background: #0f2e35;
+        }
+
+        .fb-browse-link {
+          font-size: 14px;
+          color: #4a8a96;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+
+        .fb-blob {
+          width: 110px;
+          height: 110px;
+          border-radius: 50%;
+          background: linear-gradient(145deg, #7ac4d0, #5aaabb);
+          flex-shrink: 0;
+        }
+
+        @media (min-width: 768px) {
+          .fb-blob {
+            width: 130px;
+            height: 130px;
+            margin-left: auto;
+          }
+        }
+
+        .fb-footer {
+          text-align: center;
+          padding: 20px 16px 32px;
+          font-size: 14px;
+          color: #4a8a96;
+          font-style: italic;
+          font-weight: 300;
+          letter-spacing: 0.3px;
+          flex-shrink: 0;
+        }
+
+        @media (min-width: 768px) {
+          .fb-footer {
+            padding: 20px 48px 40px;
+            font-size: 15px;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          /* Fixed blob sizes — no stretching */
+          .fb-mood-btn {
+            width: 160px;
+            height: 140px;
+            flex-shrink: 0;
+          }
+
+          /* 3-2 layout: max-width forces 3 per row, justify-content centers both rows */
+          .fb-moods-grid {
+            max-width: 560px;
+            gap: 24px;
+            justify-content: center;
+            flex-wrap: wrap;
+          }
+
+          /* Right margin on 4th blob spreads the bottom 2 blobs while keeping them centered */
+          .fb-mood-btn:nth-child(4) {
+            margin-right: 100px;
+          }
+        }
+      `}</style>
+
+      <div className="fb-root">
         {/* navbar */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button aria-label="menu" onClick={() => setDrawerOpen(true)} className="flex text-[#3a4d55]">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="flex text-[#3a8a8f]">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 9c2.4-3 4.3-3 6.7 0s4.3 3 6.7 0 4.3-3 6.6 0" /><path d="M2 14.5c2.4-3 4.3-3 6.7 0s4.3 3 6.7 0 4.3-3 6.6 0" /></svg>
-              </span>
-              <span className="text-[23px] font-semibold tracking-tight">feelbetter</span>
+        <nav className="fb-navbar">
+          <div className="fb-logo-wrap">
+            <div className="fb-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
+              <span /><span /><span />
+            </div>
+            <div className="fb-logo">
+              <svg width="20" height="15" viewBox="0 0 22 16" fill="none">
+                <path d="M1 5C3.5 2.5 6.5 2.5 9 5C11.5 7.5 14.5 7.5 17 5C19.5 2.5 21 3 21 3"
+                  stroke="#2a5a66" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M1 10C3.5 7.5 6.5 7.5 9 10C11.5 12.5 14.5 12.5 17 10C19.5 7.5 21 8 21 8"
+                  stroke="#2a5a66" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              feelbetter
             </div>
           </div>
-          <div className="text-[17px] italic text-[#7693a0]">{now}</div>
-        </div>
+          <div className="fb-time">{clock}</div>
+        </nav>
 
-        {/* greeting */}
-        <div className="mt-14">
-          <div className="font-serif text-[66px] leading-none">hello {name},</div>
-          <div className="mt-4 text-[22px] font-light text-[#7c9098]">{sub}</div>
-        </div>
+        <div className="fb-wrapper">
+          {/* sidebar overlay (mobile) */}
+          <div 
+            className={`fb-sidebar-overlay ${sidebarOpen ? "open" : ""}`}
+            onClick={() => setSidebarOpen(false)}
+          />
 
-        {/* floating-island check-in (big left radius, bleeds off the right edge) */}
-        <div className="mt-12 ml-6 p-[46px_60px_60px] shadow-[0_24px_70px_rgba(60,120,140,0.13)] backdrop-blur-xl"
-             style={{ marginRight: "-150px", borderRadius: "60px 0 0 60px", background: "linear-gradient(180deg,rgba(255,255,255,.74),rgba(255,255,255,.5))" }}>
-          <div className="flex items-center gap-2 text-[12.5px] font-medium tracking-[2.2px] text-[#8aa6ad]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20s-7-4.6-9.4-9C1 8 2.6 4.6 6 4.6c2 0 3.2 1.2 4 2.3.8-1.1 2-2.3 4-2.3 3.4 0 5 3.4 3.4 6.4C19 15.4 12 20 12 20z" /></svg>
-            DAILY CHECK-IN
-          </div>
-          <div className="mt-3.5 font-serif text-[46px] leading-[1.08]">how do you<br />feel right now?</div>
-          <div className="mt-3.5 text-[17px] font-light italic text-[#8497a0]">pick one. nothing shifts unless you're ready.</div>
-
-          {/* organic mood-blob cluster (absolute positioned) */}
-          <div className="relative mt-9 h-[600px] w-[920px]">
-            {MOOD_KEYS.map((key) => {
-              const m = MOODS[key];
-              return (
-                <button
-                  key={key}
-                  onClick={() => openMood(key)}
-                  className="absolute flex flex-col items-center justify-center text-white transition-transform duration-300 hover:scale-[1.04]"
-                  style={{
-                    left: m.pos.left, top: m.pos.top, width: m.pos.w, height: m.pos.h,
-                    borderRadius: m.radius, background: m.blob,
-                    boxShadow: "0 20px 44px rgba(40,60,80,.28)",
-                  }}
-                >
-                  <MoodIcon name={m.icon} size={52} />
-                  <span className="mt-3 text-[20px]">{LABELS[key]}</span>
+          {/* sidebar */}
+          <aside className={`fb-sidebar ${sidebarOpen ? "open" : ""}`}>
+            <div className="fb-sidebar-top">
+              <div className="fb-sidebar-close">
+                <button className="fb-sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+                  ✕
                 </button>
-              );
-            })}
-          </div>
-        </div>
+              </div>
 
-        {/* breathe card — gentle always-on pulse */}
-        <button onClick={() => setBreathing((b) => !b)}
-                className="mt-9 flex w-full flex-col items-center rounded-[36px] p-12 shadow-[0_16px_44px_rgba(70,130,150,0.1)] backdrop-blur-md"
-                style={{ background: "linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42))" }}>
-          <div className="relative flex h-[200px] w-[200px] items-center justify-center">
-            <div className="absolute h-[200px] w-[200px] rounded-full" style={{ background: "rgba(150,205,215,.18)" }} />
-            <div className="flex h-[200px] w-[200px] animate-fbIdle items-center justify-center rounded-full text-[#f3fbfd] shadow-[0_10px_30px_rgba(120,190,205,.4)]"
-                 style={{ background: "radial-gradient(circle at 38% 32%,#bfe2ea,#8fc6d2)" }}>
-              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 9h11a2.5 2.5 0 1 0-2.5-2.5" /><path d="M3 14h14a2.5 2.5 0 1 1-2.5 2.5" /></svg>
+              <div className="fb-profile">
+                <div className="fb-profile-avatar">{isGuest ? "👤" : initials}</div>
+                <div className="fb-profile-info">
+                  <div className="fb-profile-name">{isGuest ? "guest" : fullName}</div>
+                  <div className="fb-profile-action">{isGuest ? "not saved" : "tap for settings"}</div>
+                </div>
+              </div>
+
+              <div className="fb-anon-toggle">
+                <div className="fb-anon-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="1.5">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <label className="fb-anon-label">anonymous mode</label>
+                <button 
+                  className={`fb-toggle ${anonymousMode ? "on" : ""}`}
+                  onClick={() => setAnonymousMode(!anonymousMode)}
+                >
+                  <div className="fb-toggle-thumb" />
+                </button>
+              </div>
+            </div>
+
+            <div className="fb-sidebar-middle">
+              <div className="fb-sidebar-section">
+                <div className="fb-sidebar-section-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="1.5">
+                    <polyline points="12 1 19 5 19 19 12 23 5 19 5 5 12 1" />
+                  </svg>
+                  last 7 days
+                </div>
+                <div className="fb-mood-dots">
+                  <div className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS.empty }} />
+                  <div className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS.overwhelmed }} />
+                  <div className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS.okayish }} />
+                  <div className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS.empty }} />
+                  <div className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS.heavy }} />
+                  <div className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS.full }} />
+                  <div className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS.overwhelmed }} />
+                </div>
+              </div>
+
+              <div className="fb-sidebar-section">
+                <div className="fb-sidebar-section-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="1.5">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                  </svg>
+                  history
+                </div>
+                <div className="fb-history-item">
+                  <span>your entries</span>
+                  <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="1.5">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="fb-sidebar-section">
+                <div className="fb-sidebar-section-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="1.5">
+                    <polygon points="11 5 6 9 9 9 9 15 13 15 13 9 16 9 11 5" />
+                    <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
+                  </svg>
+                  ocean waves
+                </div>
+                <div className="fb-sound-selector">ocean waves</div>
+              </div>
+
+              <div className="fb-sidebar-section">
+                <div className="fb-sidebar-section-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="1.5">
+                    <circle cx="12" cy="12" r="1" />
+                    <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24" />
+                  </svg>
+                  settings
+                </div>
+                <div className="fb-settings-item">font size</div>
+              </div>
+            </div>
+
+            <div className="fb-sidebar-bottom">
+              <div className="fb-logout" onClick={handleLogout} style={{ cursor: 'pointer' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="1.5">
+                  <path d="M10 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4M16 17l5-5m0 0l-5-5" />
+                </svg>
+                {isGuest ? "sign in" : "logout"}
+              </div>
+            </div>
+          </aside>
+
+          {/* main content */}
+          <div className="fb-main">
+            <p className="fb-greeting">{anonymousMode ? "hello there," : `hello ${firstName},`}</p>
+            <p className="fb-subgreeting">{getSubGreeting()}</p>
+
+            {/* DAILY CHECK-IN CARD */}
+            <div className="fb-checkin-card">
+              <div className="fb-checkin-label">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                  stroke="#4a8a96" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+                daily check-in
+              </div>
+              <h2 className="fb-checkin-heading">how do you feel right now?</h2>
+              <p className="fb-checkin-hint">pick one. nothing shifts unless you're ready.</p>
+
+              <div className="fb-moods-grid">
+                {MOODS.map((mood) => (
+                  <button
+                    key={mood.id}
+                    onClick={() => setActiveMood(mood.id)}
+                    className="fb-mood-btn"
+                    style={{ backgroundColor: mood.color }}
+                    aria-pressed={activeMood === mood.id}
+                  >
+                    <div className="fb-mood-icon" style={{ color: mood.textColor }}>
+                      {mood.id === "empty" && (
+                        <svg viewBox="0 0 32 32" width="28" height="28" fill="none"
+                          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                          <circle cx="16" cy="12" r="4" />
+                          <path d="M8 24 Q16 18 24 24" />
+                          <path d="M6 27 Q16 21 26 27" />
+                        </svg>
+                      )}
+                      {mood.id === "overwhelmed" && (
+                        <svg viewBox="0 0 32 32" width="28" height="28" fill="none"
+                          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                          <path d="M4 14 Q10 10 16 14 Q22 18 28 14" />
+                          <path d="M4 20 Q10 16 16 20 Q22 24 28 20" />
+                          <circle cx="16" cy="8" r="2.5" />
+                        </svg>
+                      )}
+                      {mood.id === "okayish" && (
+                        <svg viewBox="0 0 32 32" width="28" height="28" fill="none"
+                          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                          <circle cx="16" cy="12" r="6" />
+                          <path d="M10 6 L16 2 L22 6" />
+                          <path d="M8 20 L24 20" />
+                        </svg>
+                      )}
+                      {mood.id === "heavy" && (
+                        <svg viewBox="0 0 32 32" width="28" height="28" fill="none"
+                          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                          <path d="M16 4 Q20 12 16 20 Q14 24 16 28" />
+                          <ellipse cx="16" cy="28" rx="4" ry="2" />
+                        </svg>
+                      )}
+                      {mood.id === "full" && (
+                        <svg viewBox="0 0 32 32" width="28" height="28" fill="none"
+                          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                          <circle cx="16" cy="16" r="5" />
+                          <path d="M16 2 L16 6M16 26 L16 30M2 16 L6 16M26 16 L30 16M6.3 6.3 L9.2 9.2M22.8 22.8 L25.7 25.7M25.7 6.3 L22.8 9.2M9.2 22.8 L6.3 25.7" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="fb-mood-label" style={{ color: mood.textColor }}>
+                      {mood.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* BREATHE CARD */}
+            <div className="fb-breathe-card">
+              <div className="fb-breathe-outer">
+                <div className="fb-breathe-inner" onClick={startBreathe}>
+                  <svg viewBox="0 0 28 28" width="26" height="26" fill="none"
+                    stroke="white" strokeWidth="1.8" strokeLinecap="round">
+                    <path d="M4 14 Q8 10 12 14 Q16 18 20 14 Q22 12 24 14" />
+                    <path d="M4 18 Q8 14 12 18 Q16 22 20 18 Q22 16 24 18" />
+                  </svg>
+                </div>
+              </div>
+              <div className="fb-breathe-label">breathe</div>
+              <div className="fb-breathe-hint">{breatheText}</div>
+            </div>
+
+            {/* WHISPER CARD */}
+            <div className="fb-whisper-card">
+              <div className="fb-whisper-icon">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+                  stroke="#4a8a96" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                </svg>
+              </div>
+              <div>
+                <div className="fb-whisper-label">whisper a thought</div>
+                <div className="fb-whisper-desc">no one reads it but you.</div>
+              </div>
+              <button className="fb-open-btn">open</button>
+            </div>
+
+            {/* WIND-DOWN CARD */}
+            <div className="fb-winddown-card">
+              <div>
+                <div className="fb-winddown-label">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                    stroke="#4a8a96" strokeWidth="1.8" strokeLinecap="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                  tonight's wind-down
+                </div>
+                <div className="fb-winddown-title">a 9-minute story for sleep</div>
+                <div className="fb-winddown-sub">"the quiet harbor" · narrated softly</div>
+                <div className="fb-winddown-actions">
+                  <button className="fb-play-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    play
+                  </button>
+                  <span className="fb-browse-link">browse library</span>
+                </div>
+              </div>
+              <div className="fb-blob" />
             </div>
           </div>
-          <div className="mt-6 text-[13px] font-medium tracking-[3px] text-[#7e98a0]">BREATHE</div>
-          <div className="mt-2 text-[19px] font-light text-[#566970]">
-            {breathing ? "breathe with the circle 🌊" : "tap to begin a 4·7·8 cycle"}
-          </div>
-        </button>
-
-        {/* whisper a thought */}
-        <div className="mt-6 flex items-center gap-6 rounded-[42px] p-[26px_36px] shadow-[0_14px_40px_rgba(70,130,150,0.1)] backdrop-blur-md"
-             style={{ background: "linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42))" }}>
-          <div className="flex h-14 w-14 flex-none items-center justify-center rounded-full bg-[#bfe0e8] text-[#3a7e8a]">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5c3-1 6-1 8 0 2-1 5-1 8 0v14c-3-1-6-1-8 0-2-1-5-1-8 0V5z" /><path d="M12 5v14" /></svg>
-          </div>
-          <div className="flex-1">
-            <div className="text-[12.5px] font-medium tracking-[2.2px] text-[#8aa6ad]">WHISPER A THOUGHT</div>
-            <div className="mt-1 text-[21px] font-light text-[#3c4f57]">no one reads it but you.</div>
-          </div>
-          <button className="flex-none rounded-[30px] px-7 py-2.5 text-[15px] text-white shadow-[0_8px_20px_rgba(95,160,172,0.35)]"
-                  style={{ background: "linear-gradient(135deg,#5fa0ac,#7bbac4)" }}>open</button>
         </div>
 
-        {/* tonight's wind-down */}
-        <div className="mt-6 flex items-center gap-7 rounded-[42px] p-[34px_40px] shadow-[0_14px_40px_rgba(70,130,150,0.1)] backdrop-blur-md"
-             style={{ background: "linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42))" }}>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 text-[12.5px] font-medium tracking-[2.2px] text-[#8aa6ad]">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z" /></svg>
-              TONIGHT'S WIND-DOWN
-            </div>
-            <div className="mt-3 font-serif text-[32px]">a 9-minute story for sleep</div>
-            <div className="mt-2 text-[16px] font-light text-[#7c9098]">"the quiet harbor" · narrated softly</div>
-            <div className="mt-5 flex items-center gap-6">
-              <button className="flex items-center gap-2.5 rounded-[30px] bg-[#2f3e45] px-6 py-2.5 text-[15px] text-[#eef4f5]">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3l1.6 5L19 9.6l-5.4 1.5L12 16l-1.6-4.9L5 9.6l5.4-1.6z" /></svg>
-                play
-              </button>
-              <span className="cursor-pointer text-[15px] text-[#6a838c]">browse library</span>
-            </div>
-          </div>
-          <div className="h-[150px] w-[150px] flex-none rounded-full shadow-[0_14px_34px_rgba(120,180,195,.32)]"
-               style={{ background: "radial-gradient(circle at 38% 34%,#cfeaf0,#a6d2dc)" }} />
-        </div>
-
-        {/* footer quote (stays neutral — dashboard never changes) */}
-        <div className="py-14 text-center text-[16.5px] font-light italic text-[#7c9098]">
-          whatever you're feeling, it's welcome here.
-        </div>
+        <div className="fb-footer">{footer}</div>
       </div>
-
-      {/* ===== SIDEBAR (drawer) ===== */}
-      {/* dim backdrop */}
-      <div onClick={() => setDrawerOpen(false)}
-           className={`fixed inset-0 z-40 bg-[rgba(20,45,52,0.32)] transition-opacity duration-300 ${drawerOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
-      {/* panel */}
-      <div className={`fixed left-0 top-0 z-50 flex h-full w-[342px] flex-col overflow-y-auto p-[28px_28px_24px] shadow-[24px_0_60px_rgba(40,90,105,0.16)] transition-transform duration-[420ms] ${drawerOpen ? "translate-x-0" : "-translate-x-[112%]"}`}
-           style={{ background: "linear-gradient(180deg,#dceef2,#cde7ed)" }}>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="flex text-[#3a8a8f]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 9c2.4-3 4.3-3 6.7 0s4.3 3 6.7 0 4.3-3 6.6 0" /><path d="M2 14.5c2.4-3 4.3-3 6.7 0s4.3 3 6.7 0 4.3-3 6.6 0" /></svg></span>
-            <span className="text-[20px] font-semibold">feelbetter</span>
-          </div>
-          <button onClick={() => setDrawerOpen(false)} className="flex text-[#5a747c]">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19" /></svg>
-          </button>
-        </div>
-
-        {/* profile */}
-        <div className="mt-8 flex items-center gap-3.5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full text-[15px] font-semibold text-white" style={{ background: "radial-gradient(circle at 36% 32%,#bfe2ea,#86c0cd)" }}>{initials}</div>
-          <div>
-            <div className="text-[17px] font-medium">{fullName}</div>
-            <div className="text-[13px] text-[#7c9098]">tap for settings</div>
-          </div>
-        </div>
-
-        {/* anonymous mode toggle */}
-        <button onClick={() => setAnon((a) => !a)} className="mt-7 flex items-center justify-between">
-          <span className="flex items-center gap-3 text-[16px] text-[#3c4f57]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 16c0-4 4-7 8-7s8 3 8 7" /><circle cx="12" cy="6" r="3" /></svg>
-            anonymous mode
-          </span>
-          <span className="relative h-6 w-[42px] rounded-full transition-colors duration-300" style={{ background: anon ? "#5b9aa6" : "#c2d2d6" }}>
-            <span className="absolute top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow transition-all duration-300" style={{ left: anon ? 21 : 3 }} />
-          </span>
-        </button>
-
-        {/* jump to a feeling — 5 mood-accent swatches */}
-        <div className="mt-7">
-          <div className="text-[12px] font-medium tracking-[1.6px] text-[#7e98a0]">JUMP TO A FEELING</div>
-          <div className="mt-3 flex gap-3">
-            {MOOD_KEYS.map((key) => (
-              <button key={key} title={LABELS[key]} onClick={() => openMood(key)}
-                      className="h-[34px] w-[34px] rounded-full transition-transform duration-200 hover:scale-110"
-                      style={{ background: MOODS[key].accentDot }} />
-            ))}
-          </div>
-        </div>
-
-        {/* last 7 days (recolored with the mood palette) */}
-        <div className="mt-6">
-          <div className="flex items-center gap-2 text-[13px] text-[#7e98a0]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
-            last 7 days
-          </div>
-          <div className="mt-3.5 flex gap-2.5">
-            {["#8a96a3", "#5eb4c2", "#7a8a6f", "#6b5fa3", "#1f8aa3", "#5eb4c2", "#c9a96b"].map((c, i) => (
-              <span key={i} className="h-[22px] w-[22px] rounded-full" style={{ background: c }} />
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-6 h-px bg-[rgba(120,150,160,0.22)]" />
-
-        {/* menu */}
-        <div className="mt-5 flex flex-col gap-5 text-[16px] text-[#3c4f57]">
-          <div className="flex cursor-pointer items-center gap-3">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5c3-1 6-1 8 0 2-1 5-1 8 0v14c-3-1-6-1-8 0-2-1-5-1-8 0V5z" /><path d="M12 5v14" /></svg>
-            history
-          </div>
-          <div className="flex cursor-pointer items-center justify-between">
-            <span className="flex items-center gap-3"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>privacy lock</span>
-            <span className="text-[11.5px] text-[#90a8af]">4-digit PIN</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-3"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V6l10-2v12" /><circle cx="6" cy="18" r="3" /><circle cx="16" cy="16" r="3" /></svg>ambient sound</div>
-            <div className="mt-3 flex flex-wrap gap-2 pl-8">
-              <span className="rounded-[20px] bg-[#5eb4c2] px-3 py-1 text-[12.5px] text-white">ocean waves</span>
-              {["rain", "forest", "silence"].map((s) => (
-                <span key={s} className="cursor-pointer rounded-[20px] bg-white/60 px-3 py-1 text-[12.5px] text-[#4a5d64]">{s}</span>
-              ))}
-            </div>
-          </div>
-          <div className="flex cursor-pointer items-center gap-3">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 8h8M16 8h4M4 16h4M12 16h8" /><circle cx="14" cy="8" r="2.2" /><circle cx="10" cy="16" r="2.2" /></svg>
-            settings
-          </div>
-        </div>
-
-        <div className="min-h-[20px] flex-1" />
-
-        <div className="flex items-center gap-2 rounded-[16px] bg-white/50 p-[12px_15px] text-[13.5px] text-[#46606a]">🌸 you've checked in 4 days this week.</div>
-
-        <button className="mt-4 flex items-center gap-2.5 text-[14px] text-[#90a8af]">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 5h5v14h-5" /><path d="M3 12h11M11 8l4 4-4 4" /></svg>
-          logout
-        </button>
-      </div>
-
-      {/* ===== FULL-SCREEN MOOD EXPERIENCE ===== */}
-      {mood && st && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-12 text-center"
-             style={{ background: st.bg, color: st.fg }}>
-
-          {/* floating particles — only Full · State 2 */}
-          {moodKey === "full" && moodState === 2 && (
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              {[
-                { l: "12%", t: "76%", s: 10, d: "0s", bg: "rgba(255,255,255,.7)" },
-                { l: "30%", t: "90%", s: 7, d: ".8s", bg: "rgba(255,255,255,.6)" },
-                { l: "62%", t: "82%", s: 12, d: ".4s", bg: "rgba(255,233,160,.85)" },
-                { l: "80%", t: "92%", s: 8, d: "1.2s", bg: "rgba(255,255,255,.65)" },
-                { l: "90%", t: "72%", s: 9, d: ".2s", bg: "rgba(255,210,120,.8)" },
-              ].map((p, i) => (
-                <span key={i} className="absolute animate-fbFloat rounded-full"
-                      style={{ left: p.l, top: p.t, width: p.s, height: p.s, background: p.bg, animationDelay: p.d }} />
-              ))}
-            </div>
-          )}
-
-          {/* close */}
-          <button onClick={() => setMoodKey(null)} className="absolute right-9 top-7 flex opacity-50">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19" /></svg>
-          </button>
-
-          {/* content — key forces the entry fade to replay on state change */}
-          <div key={`${moodKey}-${moodState}`} className="relative flex max-w-[820px] animate-fbRise flex-col items-center">
-            <div className="mb-9 flex justify-center" style={{ color: st.accent }}>
-              <MoodIcon name={mood.icon} size={80} />
-            </div>
-            <div className="max-w-[800px] text-[clamp(34px,4.6vw,54px)] font-light leading-[1.12] tracking-[-0.5px]">{st.head}</div>
-            <div className="mt-5 max-w-[620px] text-[clamp(16px,2vw,21px)] font-light leading-[1.45] opacity-80">{st.sub}</div>
-
-            <div className="mt-11 flex flex-col items-center gap-4">
-              {/* "just sit here" only on Empty · State 1 */}
-              {moodKey === "empty" && moodState === 1 && (
-                <button onClick={() => setMoodKey(null)} className="rounded-[30px] bg-white/40 px-8 py-3 text-[16px]" style={{ color: st.fg }}>just sit here</button>
-              )}
-
-              {/* primary button: State1 advances → State2; State2 closes */}
-              <button
-                onClick={() => (moodState === 1 ? setMoodState(2) : setMoodKey(null))}
-                className="flex items-center gap-2.5 rounded-[34px] px-9 py-[15px] text-[17px] font-medium shadow-[0_12px_32px_rgba(0,0,0,0.14)]"
-                style={moodState === 1
-                  ? { background: st.accent, color: "#fff" }
-                  : { background: "rgba(255,255,255,.32)", color: st.fg }}>
-                {moodState === 1 ? "whenever you're ready" : "carry this with me"}
-                {moodState === 1 && <span className="text-[16px]">🌸</span>}
-              </button>
-
-              {moodState === 1 && <div className="text-[14px] italic opacity-60">no rush. this stays as long as you need.</div>}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    </>
+  )
 }

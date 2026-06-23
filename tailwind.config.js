@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./app/**/*.{js,jsx}", "./components/**/*.{js,jsx}"],
+  content: ["./src/app/**/*.{js,jsx}", "./src/components/**/*.{js,jsx}"],
   theme: {
     extend: {
       // Map the next/font CSS variables to Tailwind's font families

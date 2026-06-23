@@ -1,6 +1,7 @@
 // Root layout — loads the two brand fonts and exposes them as CSS variables.
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
 // DM Sans = body/UI font, DM Serif Display = headings/greeting/logo
 const dmSans = DM_Sans({
@@ -23,6 +24,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
-  );}
+  );
+}
