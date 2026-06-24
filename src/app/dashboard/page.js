@@ -1,7 +1,8 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
+import { MOOD_ACTIVITIES, ACTIVITY_MAP } from "@/app/activities/data"
 
 /* ── Mood overlay data (state 1 → state 2) ──────────────────── */
 const MOOD_SCREENS = {
@@ -193,7 +194,8 @@ export default function Dashboard() {
   const router = useRouter()
   const { user, loading, signOut } = useAuth()
 
-  const [clock,         setClock]         = useState(getClock())
+  const [mounted,       setMounted]       = useState(false)
+  const [clock,         setClock]         = useState("")
   const [moodOverlay,   setMoodOverlay]   = useState(null)   // which mood overlay is open
   const [overlayState,  setOverlayState]  = useState(1)      // 1 = "I see you", 2 = "I've got you"
   const [breatheText,   setBreatheText]   = useState("tap to begin a 4·7·8 cycle")
@@ -202,6 +204,8 @@ export default function Dashboard() {
   const [isDesktop,     setIsDesktop]     = useState(false)
   const [anonymousMode, setAnonymousMode] = useState(false)
   const [isGuest,       setIsGuest]       = useState(false)
+  const [clusterScale,  setClusterScale]  = useState(1)
+  const clusterWrapRef = useRef(null)
 
   useEffect(() => {
     if (user) {
@@ -215,8 +219,14 @@ export default function Dashboard() {
   }, [user, loading])
 
   useEffect(() => {
+    setMounted(true)
+    setClock(getClock())
     const t = setInterval(() => setClock(getClock()), 30000)
-    const check = () => setIsDesktop(window.innerWidth >= 1024)
+    const measureCluster = () => {
+      if (clusterWrapRef.current)
+        setClusterScale(Math.min(1, clusterWrapRef.current.offsetWidth / 920))
+    }
+    const check = () => { setIsDesktop(window.innerWidth >= 1024); measureCluster() }
     check()
     window.addEventListener("resize", check)
     return () => { clearInterval(t); window.removeEventListener("resize", check) }
@@ -326,16 +336,16 @@ export default function Dashboard() {
 
         .fb-greeting{font-family:var(--font-dm-serif),serif;font-size:42px;color:#0f2e35;font-weight:400;line-height:1.1;margin-bottom:4px;letter-spacing:-1px}
         @media(min-width:768px){.fb-greeting{font-size:56px;margin-bottom:8px;letter-spacing:-1.5px}}
-        .fb-subgreeting{font-size:16px;color:#3a6a75;font-weight:300;margin-bottom:32px}
-        @media(min-width:768px){.fb-subgreeting{font-size:18px;margin-bottom:40px}}
+        .fb-subgreeting{font-size:18px;color:#3a6a75;font-weight:300;margin-bottom:32px}
+        @media(min-width:768px){.fb-subgreeting{font-size:22px;margin-bottom:40px}}
 
         /* ── CHECK-IN CARD ─────────────────────────────────────────────────────── */
         .fb-checkin-card{background:rgba(255,255,255,.65);border-radius:32px;padding:32px 24px;border:.5px solid rgba(255,255,255,.95);backdrop-filter:blur(10px);margin-bottom:24px}
         @media(min-width:768px){.fb-checkin-card{padding:40px 32px;margin-bottom:28px}}
-        .fb-checkin-label{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4a8a96;font-weight:500;margin-bottom:12px}
-        .fb-checkin-heading{font-family:var(--font-dm-serif),serif;font-size:28px;color:#0f2e35;line-height:1.2;margin-bottom:12px;font-weight:400}
-        @media(min-width:768px){.fb-checkin-heading{font-size:32px;margin-bottom:16px}}
-        .fb-checkin-hint{font-size:15px;color:#5a8a96;font-weight:300;font-style:italic;margin-bottom:28px}
+        .fb-checkin-label{display:flex;align-items:center;gap:6px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#4a8a96;font-weight:500;margin-bottom:12px}
+        .fb-checkin-heading{font-family:var(--font-dm-serif),serif;font-size:30px;color:#0f2e35;line-height:1.2;margin-bottom:12px;font-weight:400}
+        @media(min-width:768px){.fb-checkin-heading{font-size:36px;margin-bottom:16px}}
+        .fb-checkin-hint{font-size:17px;color:#5a8a96;font-weight:300;font-style:italic;margin-bottom:28px}
 
         /* ── MOOD GRID (mobile/tablet) ─────────────────────────────────────────── */
         .fb-moods-grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center}
@@ -416,9 +426,9 @@ export default function Dashboard() {
             justify-content:flex-start;
           }
           .fb-logo-wrap{gap:22px}
-          .fb-logo{font-size:34px;font-weight:600;letter-spacing:-.5px;color:#2f3e45;gap:14px}
+          .fb-logo{font-size:clamp(22px, 1.77vw, 34px);font-weight:600;letter-spacing:-.5px;color:#2f3e45;gap:14px}
           .fb-logo svg{width:42px;height:42px}
-          .fb-time{font-style:italic;color:#7693a0;font-size:17px;margin-left:auto}
+          .fb-time{font-style:italic;color:#7693a0;font-size:clamp(18px, 1.35vw, 26px);margin-left:auto}
 
           /* Main — full width, same scaled padding, no max-width constraint */
           .fb-main{
@@ -427,66 +437,66 @@ export default function Dashboard() {
           }
 
           /* Greeting */
-          .fb-greeting{font-size:66px;line-height:1;color:#2f3e45;margin-top:58px;margin-bottom:0;letter-spacing:0}
-          .fb-subgreeting{font-size:22px;color:#7c9098;font-weight:300;margin-top:16px;margin-bottom:0}
+          .fb-greeting{font-size:clamp(56px, 4.48vw, 86px);line-height:1;color:#2f3e45;margin-top:58px;margin-bottom:0;letter-spacing:0}
+          .fb-subgreeting{font-size:clamp(22px, 1.77vw, 34px);color:#7c9098;font-weight:300;margin-top:20px;margin-bottom:0}
 
           /* Floating island — bleeds off the right edge */
           .fb-checkin-card{
             margin:46px -150px 0 0;
             border-radius:60px 0 0 60px;
-            padding:46px 60px 60px;margin-bottom:0;
+            padding:52px 68px 68px;margin-bottom:0;
             background:linear-gradient(180deg,rgba(255,255,255,.74),rgba(255,255,255,.5));
             backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
             box-shadow:0 24px 70px rgba(60,120,140,.13);border:none;
           }
-          .fb-checkin-label{font-size:12.5px;letter-spacing:2.2px;color:#8aa6ad;margin-bottom:0}
-          .fb-checkin-heading{font-size:46px;line-height:1.08;margin-top:14px;margin-bottom:0}
-          .fb-checkin-hint{font-size:17px;font-weight:300;color:#8497a0;margin-top:14px;margin-bottom:0}
+          .fb-checkin-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2px;color:#8aa6ad;margin-bottom:0}
+          .fb-checkin-heading{font-size:clamp(44px, 3.54vw, 68px);line-height:1.06;margin-top:20px;margin-bottom:0}
+          .fb-checkin-hint{font-size:clamp(20px, 1.61vw, 31px);font-weight:300;color:#8497a0;margin-top:20px;margin-bottom:0}
 
           /* Desktop mood cluster */
           .fb-moods-cluster-desktop{position:relative;width:920px;height:600px;margin-top:34px}
 
           /* Breathe card */
           .fb-breathe-card{
-            margin-top:34px;margin-bottom:0;border-radius:36px;padding:48px;
+            margin-top:34px;margin-bottom:0;border-radius:36px;padding:56px;
             background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42));
             backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
             box-shadow:0 16px 44px rgba(70,130,150,.1);border:none;
           }
           .fb-breathe-outer{width:200px;height:200px}
           .fb-breathe-inner{width:200px;height:200px}
-          .fb-breathe-label{font-size:13px;letter-spacing:3px;color:#7e98a0}
-          .fb-breathe-hint{font-size:19px;color:#566970}
+          .fb-breathe-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2.5px;color:#7e98a0}
+          .fb-breathe-hint{font-size:clamp(22px, 1.77vw, 34px);color:#566970}
 
           /* Whisper card */
           .fb-whisper-card{
-            margin-top:24px;margin-bottom:0;border-radius:42px;padding:26px 36px;gap:22px;
+            margin-top:28px;margin-bottom:0;border-radius:42px;padding:34px 44px;gap:26px;
             background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42));
             backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
             box-shadow:0 14px 40px rgba(70,130,150,.1);border:none;
           }
-          .fb-whisper-icon{width:56px;height:56px;border-radius:50%;background:#bfe0e8;flex-shrink:0}
-          .fb-whisper-label{font-size:12.5px;letter-spacing:2.2px;color:#8aa6ad}
-          .fb-whisper-desc{font-size:21px;color:#3c4f57;font-weight:300;margin-top:5px}
-          .fb-open-btn{background:linear-gradient(135deg,#5fa0ac,#7bbac4);font-size:15px;padding:11px 28px;box-shadow:0 8px 20px rgba(95,160,172,.35)}
+          .fb-whisper-icon{width:72px;height:72px;border-radius:50%;background:#bfe0e8;flex-shrink:0}
+          .fb-whisper-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2px;color:#8aa6ad}
+          .fb-whisper-desc{font-size:clamp(24px, 1.88vw, 36px);color:#3c4f57;font-weight:300;margin-top:8px}
+          .fb-open-btn{background:linear-gradient(135deg,#5fa0ac,#7bbac4);font-size:clamp(18px, 1.35vw, 26px);padding:17px 40px;box-shadow:0 8px 20px rgba(95,160,172,.35)}
 
           /* Wind-down card */
           .fb-winddown-card{
-            margin-top:24px;margin-bottom:0;border-radius:42px;padding:34px 40px;gap:28px;
+            margin-top:28px;margin-bottom:0;border-radius:42px;padding:44px 50px;gap:36px;
             background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42));
             backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
             box-shadow:0 14px 40px rgba(70,130,150,.1);border:none;
             flex-direction:row;align-items:center;
           }
-          .fb-winddown-label{font-size:12.5px;letter-spacing:2.2px;color:#8aa6ad}
-          .fb-winddown-title{font-size:32px}
-          .fb-winddown-sub{font-size:16px}
-          .fb-play-btn{background:#2f3e45;color:#eef4f5;font-size:15px;padding:11px 24px;border-radius:30px}
-          .fb-browse-link{font-size:15px}
-          .fb-blob{width:150px;height:150px;background:radial-gradient(circle at 38% 34%,#cfeaf0,#a6d2dc);box-shadow:0 14px 34px rgba(120,180,195,.32);margin-left:auto;flex-shrink:0}
+          .fb-winddown-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2px;color:#8aa6ad}
+          .fb-winddown-title{font-size:clamp(32px, 2.5vw, 48px)}
+          .fb-winddown-sub{font-size:clamp(19px, 1.51vw, 29px)}
+          .fb-play-btn{background:#2f3e45;color:#eef4f5;font-size:clamp(18px, 1.35vw, 26px);padding:16px 36px;border-radius:32px}
+          .fb-browse-link{font-size:clamp(18px, 1.35vw, 26px)}
+          .fb-blob{width:180px;height:180px;background:radial-gradient(circle at 38% 34%,#cfeaf0,#a6d2dc);box-shadow:0 14px 34px rgba(120,180,195,.32);margin-left:auto;flex-shrink:0}
 
           /* Footer */
-          .fb-footer{padding:54px 0 66px;font-size:16.5px;color:#7c9098}
+          .fb-footer{padding:54px 0 66px;font-size:clamp(18px, 1.35vw, 26px);color:#7c9098}
         }
       `}</style>
 
@@ -506,7 +516,7 @@ export default function Dashboard() {
               feelbetter
             </div>
           </div>
-          <div className="fb-time">{clock}</div>
+          <div className="fb-time">{mounted ? clock : ""}</div>
         </nav>
 
         <div className="fb-wrapper">
@@ -596,6 +606,23 @@ export default function Dashboard() {
               </div>
               <div className="fb-sidebar-section">
                 <div className="fb-sidebar-section-label">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+                  </svg>
+                  activities
+                </div>
+                <div
+                  onClick={() => router.push("/activities")}
+                  style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 20px", background:"rgba(255,255,255,.5)", borderRadius:12, cursor:"pointer", fontSize:22, color:"#1a3a42", transition:"background .2s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+                >
+                  <span>explore activities</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+              </div>
+              <div className="fb-sidebar-section">
+                <div className="fb-sidebar-section-label">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                     <path d="M4 8h8M16 8h4M4 16h4M12 16h8"/>
                     <circle cx="14" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/>
@@ -621,7 +648,7 @@ export default function Dashboard() {
           {/* ── MAIN CONTENT ───────────────────────────────────────────────── */}
           <div className="fb-main">
             <p className="fb-greeting">{anonymousMode ? "hello there," : `hello ${firstName},`}</p>
-            <p className="fb-subgreeting">{getSubGreeting()}</p>
+            <p className="fb-subgreeting">{mounted ? getSubGreeting() : ""}</p>
 
             {/* CHECK-IN CARD */}
             <div className="fb-checkin-card">
@@ -638,7 +665,9 @@ export default function Dashboard() {
 
               {/* MOOD CLUSTER — desktop: absolute organic blobs | mobile: flex grid */}
               {isDesktop ? (
-                <div className="fb-moods-cluster-desktop">
+                /* outer div measures available width; inner cluster scales to fit */
+                <div ref={clusterWrapRef} style={{ width:"100%", height: clusterScale * 600, overflow:"visible" }}>
+                <div className="fb-moods-cluster-desktop" style={{ transform:`scale(${clusterScale})`, transformOrigin:"top left" }}>
                   {DESKTOP_BLOBS.map(blob => (
                     <div
                       key={blob.id}
@@ -662,6 +691,7 @@ export default function Dashboard() {
                       <div style={{ marginTop:14, fontSize:20, fontWeight:400 }}>{blob.label}</div>
                     </div>
                   ))}
+                </div>
                 </div>
               ) : (
                 <div className="fb-moods-grid">
@@ -737,6 +767,23 @@ export default function Dashboard() {
               </div>
               <div className="fb-blob" />
             </div>
+
+            {/* ACTIVITIES NUDGE */}
+            <div
+              onClick={() => router.push("/activities")}
+              style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"22px 28px", marginTop:20, background:"rgba(255,255,255,.5)", backdropFilter:"blur(10px)", borderRadius:24, border:".5px solid rgba(255,255,255,.85)", cursor:"pointer", transition:"background .2s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.75)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+            >
+              <div>
+                <div style={{ fontSize:26, letterSpacing:1.6, textTransform:"uppercase", color:"#6a9aaa", fontWeight:500, marginBottom:6 }}>ACTIVITIES</div>
+                <div style={{ fontSize:34, color:"#3c4f57", fontWeight:300 }}>something small to do right now</div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, color:"#4a8a96", fontSize:29, fontWeight:400, flexShrink:0 }}>
+                explore
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -795,11 +842,11 @@ export default function Dashboard() {
               <OverlayIcon icon={overlayDef.icon} color={st.accent} />
             </div>
 
-            <div style={{ fontSize:"clamp(42px,5.5vw,68px)", fontWeight:300, lineHeight:1.1, letterSpacing:"-.8px" }}>
+            <div style={{ fontSize:"clamp(44px, 6vw, 72px)", fontWeight:300, lineHeight:1.1, letterSpacing:"-.8px" }}>
               {st.head}
             </div>
 
-            <div style={{ marginTop:28, fontSize:"clamp(22px,2.6vw,30px)", fontWeight:300, opacity:.85, lineHeight:1.65 }}>
+            <div style={{ marginTop:28, fontSize:"clamp(19px, 2.4vw, 26px)", fontWeight:300, opacity:.85, lineHeight:1.65 }}>
               {st.sub}
             </div>
 
@@ -829,6 +876,47 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+
+            {/* state 2 only: suggested activities for this mood */}
+            {!isS1 && MOOD_ACTIVITIES[moodOverlay] && (
+              <div style={{ marginTop:52, borderTop:"1px solid rgba(255,255,255,.25)", paddingTop:40, display:"flex", flexDirection:"column", alignItems:"center", gap:18 }}>
+                <div style={{ fontSize:18, fontWeight:300, opacity:.7, letterSpacing:.3 }}>
+                  want to do something with this?
+                </div>
+                <div style={{ display:"flex", gap:14, flexWrap:"wrap", justifyContent:"center" }}>
+                  {MOOD_ACTIVITIES[moodOverlay].map(id => {
+                    const act = ACTIVITY_MAP[id]
+                    return (
+                      <div
+                        key={id}
+                        onClick={() => { closeOverlay(); router.push(act.route) }}
+                        style={{
+                          display:"flex", alignItems:"center", gap:10,
+                          background:"rgba(255,255,255,.22)",
+                          border:"1px solid rgba(255,255,255,.35)",
+                          color: st.fg,
+                          padding:"13px 28px", borderRadius:32, cursor:"pointer",
+                          fontSize:18, fontWeight:400,
+                          backdropFilter:"blur(8px)",
+                          transition:"background .2s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.36)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.22)"}
+                      >
+                        <span style={{ fontSize:14, opacity:.7, textTransform:"uppercase", letterSpacing:1 }}>{act.name}</span>
+                        <span style={{ fontSize:14, opacity:.6 }}>· {act.desc}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div
+                  onClick={() => { closeOverlay(); router.push("/activities") }}
+                  style={{ fontSize:16, opacity:.6, cursor:"pointer", textDecoration:"underline", marginTop:4 }}
+                >
+                  see all 5 →
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
