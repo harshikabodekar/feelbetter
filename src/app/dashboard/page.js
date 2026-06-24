@@ -3,14 +3,102 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 
-const MOODS = [
-  { id: "empty",       label: "empty",       color: "#515d6e", textColor: "#ffffff" },
-  { id: "overwhelmed", label: "overwhelmed", color: "#0a6878", textColor: "#ffffff" },
-  { id: "okayish",     label: "okay-ish",    color: "#7a8a5a", textColor: "#ffffff" },
-  { id: "heavy",       label: "heavy",       color: "#1a1060", textColor: "#ffffff" },
-  { id: "full",        label: "full",        color: "#d07030", textColor: "#ffffff" },
-]
+/* ── Mood overlay data (state 1 → state 2) ──────────────────── */
+const MOOD_SCREENS = {
+  empty: {
+    icon: "empty",
+    s1: { bg: "linear-gradient(180deg,#b8c2cc 0%,#d6dce0 100%)", fg: "#3a4651", accent: "#8a96a3",
+          head: "it's okay to feel nothing right now.",
+          sub: "no task. no fixing. just sit here with the quiet.", showSit: true },
+    s2: { bg: "linear-gradient(180deg,#e8dfc9 0%,#f5ecd7 100%)", fg: "#5b4a32", accent: "#c9a96b",
+          head: "something is still here. you are still here.",
+          sub: "warmth seeps in, slowly. nothing to chase. nothing to prove." },
+  },
+  overwhelmed: {
+    icon: "wave",
+    s1: { bg: "linear-gradient(180deg,#0d4f5c 0%,#1a6b78 100%)", fg: "#e8f4f6", accent: "#5eb4c2",
+          head: "one thing at a time.",
+          sub: "the weight is real. but you don't have to lift it all at once." },
+    s2: { bg: "linear-gradient(180deg,#b8e0d4 0%,#d8eee5 100%)", fg: "#2d4a45", accent: "#5fa896",
+          head: "one breath. one thing. you've got this.",
+          sub: "the screen exhales with you. the room widens." },
+  },
+  okayish: {
+    icon: "suncloud",
+    s1: { bg: "linear-gradient(180deg,#a8a89c 0%,#c2c2b4 100%)", fg: "#3f3f36", accent: "#7a8a6f",
+          head: "an overcast kind of afternoon.",
+          sub: "not bad. not bright. just here, and that's enough." },
+    s2: { bg: "linear-gradient(180deg,#f5c98f 0%,#fbdcb0 60%,#ffe6c4 100%)", fg: "#5a3b1a", accent: "#e09650",
+          head: "the clouds are parting.",
+          sub: "golden hour finds you. a little amber, a little peach." },
+  },
+  heavy: {
+    icon: "drop",
+    s1: { bg: "linear-gradient(180deg,#1e1b3a 0%,#2d2655 100%)", fg: "#dcd6f0", accent: "#6b5fa3",
+          head: "cold, still, underwater.",
+          sub: "stay as long as you need. nothing here is asking anything of you." },
+    s2: { bg: "linear-gradient(0deg,#d4869a 0%,#a37396 40%,#574a78 100%)", fg: "#fff0f0", accent: "#e8a8b8",
+          head: "you've carried this long enough. set it down for a moment.",
+          sub: "warm light glows from below. the cold loosens its grip." },
+  },
+  full: {
+    icon: "flower",
+    s1: { bg: "linear-gradient(180deg,#7ed4e6 0%,#b5e8f0 100%)", fg: "#0f3a4a", accent: "#1f8aa3",
+          head: "light and alive.",
+          sub: "bright aqua, open sky. let it spill into everything you do today." },
+    s2: { bg: "linear-gradient(135deg,#FFD93D 0%,#FFB347 50%,#FF6B6B 100%)", fg: "#3d1a0d", accent: "#FF6B6B",
+          head: "golden hour, exploding.",
+          sub: "hold this close. you are allowed to be this full.", showParticles: true },
+  },
+}
 
+/* ── Overlay mood icons ─────────────────────────────────────── */
+function OverlayIcon({ icon, color }) {
+  if (icon === "empty") return (
+    <svg width="76" height="76" viewBox="0 0 48 48" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="24" cy="15" r="6"/>
+      <circle cx="24" cy="15" r="1.5" fill={color} stroke="none"/>
+      <path d="M7 30c4-4 7.5-4 11.5 0s7.5 4 11.5 0 7.5-4 11-1.5"/>
+      <path d="M7 37c4-4 7.5-4 11.5 0s7.5 4 11.5 0 7.5-4 11-1.5"/>
+    </svg>
+  )
+  if (icon === "wave") return (
+    <svg width="82" height="82" viewBox="0 0 48 48" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 18c4.5-6 9-6 13.5 0s9 6 13.5 0 4.5-6 9-3"/>
+      <path d="M6 30c4.5-6 9-6 13.5 0s9 6 13.5 0 4.5-6 9-3"/>
+      <circle cx="22" cy="24" r="1.9" fill={color} stroke="none"/>
+    </svg>
+  )
+  if (icon === "suncloud") return (
+    <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="22" cy="18" r="6.5"/>
+      <path d="M22 5.5v-2.5M10 18H7.5M34 18h2.5M13.6 9.6l-1.8-1.8M30.4 9.6l1.8-1.8"/>
+      <path d="M11 36c0-6.2 5-10.5 11.5-10.5S34 29.8 34 36z" fill={color} stroke="none"/>
+    </svg>
+  )
+  if (icon === "drop") return (
+    <svg width="74" height="74" viewBox="0 0 48 48" fill="none">
+      <path d="M24 7s-10 11-10 18a10 10 0 0 0 20 0c0-7-10-18-10-18z" fill={color}/>
+      <ellipse cx="24" cy="37" rx="12" ry="3.2" stroke={color} strokeWidth="2" opacity=".5"/>
+    </svg>
+  )
+  if (icon === "flower") return (
+    <svg width="84" height="84" viewBox="0 0 48 48" fill="none">
+      <g fill={color}>
+        <ellipse cx="24" cy="13" rx="4.6" ry="9"/>
+        <ellipse cx="24" cy="13" rx="4.6" ry="9" transform="rotate(60 24 24)"/>
+        <ellipse cx="24" cy="13" rx="4.6" ry="9" transform="rotate(120 24 24)"/>
+        <ellipse cx="24" cy="13" rx="4.6" ry="9" transform="rotate(180 24 24)"/>
+        <ellipse cx="24" cy="13" rx="4.6" ry="9" transform="rotate(240 24 24)"/>
+        <ellipse cx="24" cy="13" rx="4.6" ry="9" transform="rotate(300 24 24)"/>
+      </g>
+      <circle cx="24" cy="24" r="3" fill="rgba(255,255,255,.5)"/>
+    </svg>
+  )
+  return null
+}
+
+/* ── Desktop organic blob definitions ───────────────────────── */
 const DESKTOP_BLOBS = [
   { id: "overwhelmed", label: "overwhelmed", iconSize: 58,
     left: 300, top: 24,  width: 402, height: 268,
@@ -39,6 +127,7 @@ const DESKTOP_BLOBS = [
     shadow: "0 20px 46px rgba(224,138,60,.36)", color: "#fffaf2" },
 ]
 
+/* ── Desktop blob SVG icons ─────────────────────────────────── */
 function BlobIcon({ id, size: s }) {
   if (id === "overwhelmed") return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
@@ -73,22 +162,9 @@ function BlobIcon({ id, size: s }) {
   return null
 }
 
-const BG_MAP = {
-  default:     "linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%)",
-  empty:       "linear-gradient(135deg,#8a9aa8 0%,#ccd8e0 100%)",
-  overwhelmed: "linear-gradient(135deg,#0a6878 0%,#a8dce8 100%)",
-  okayish:     "linear-gradient(135deg,#7a8a5a 0%,#c8d8a8 100%)",
-  heavy:       "linear-gradient(135deg,#1a1060 0%,#a8a0d8 100%)",
-  full:        "linear-gradient(135deg,#d07030 0%,#f8c890 100%)",
-}
-
-const FOOTER_MAP = {
-  default:     "whatever you're feeling, it's welcome here.",
-  empty:       "not feeling is also a feeling. you are still here.",
-  overwhelmed: "you don't have to solve everything tonight.",
-  okayish:     "ordinary days are still days worth living.",
-  heavy:       "you are allowed to fall apart sometimes. it doesn't make you broken.",
-  full:        "hold this feeling close. you deserve this.",
+const MOOD_COLORS = {
+  empty: "#8a9aa8", overwhelmed: "#5eb4c2",
+  okayish: "#7a8a6f", heavy: "#6b5fa3", full: "#e08a3c",
 }
 
 const BREATHE_STEPS = [
@@ -96,11 +172,6 @@ const BREATHE_STEPS = [
   { text: "hold... 7",        ms: 7000 },
   { text: "breathe out... 8", ms: 8000 },
 ]
-
-const MOOD_COLORS = {
-  empty: "#8a9aa8", overwhelmed: "#0a6878",
-  okayish: "#7a8a5a", heavy: "#1a1060", full: "#d07030",
-}
 
 function getClock() {
   const now = new Date()
@@ -119,22 +190,28 @@ function getSubGreeting() {
 }
 
 export default function Dashboard() {
-  const router   = useRouter()
+  const router = useRouter()
   const { user, loading, signOut } = useAuth()
 
-  const [clock,        setClock]        = useState(getClock())
-  const [activeMood,   setActiveMood]   = useState(null)
-  const [breatheText,  setBreatheText]  = useState("tap to begin a 4·7·8 cycle")
-  const [breatheActive,setBreatheActive]= useState(false)
-  const [sidebarOpen,  setSidebarOpen]  = useState(false)
-  const [isDesktop,    setIsDesktop]    = useState(false)
-  const [anonymousMode,setAnonymousMode]= useState(false)
-  const [isGuest,      setIsGuest]      = useState(false)
+  const [clock,         setClock]         = useState(getClock())
+  const [moodOverlay,   setMoodOverlay]   = useState(null)   // which mood overlay is open
+  const [overlayState,  setOverlayState]  = useState(1)      // 1 = "I see you", 2 = "I've got you"
+  const [breatheText,   setBreatheText]   = useState("tap to begin a 4·7·8 cycle")
+  const [breatheActive, setBreatheActive] = useState(false)
+  const [sidebarOpen,   setSidebarOpen]   = useState(false)
+  const [isDesktop,     setIsDesktop]     = useState(false)
+  const [anonymousMode, setAnonymousMode] = useState(false)
+  const [isGuest,       setIsGuest]       = useState(false)
 
   useEffect(() => {
-    const guest = localStorage.getItem("isGuest") === "true"
-    setIsGuest(guest)
-    if (!loading && !user && !guest) router.replace("/login")
+    if (user) {
+      localStorage.removeItem("isGuest")
+      setIsGuest(false)
+    } else {
+      const guest = localStorage.getItem("isGuest") === "true"
+      setIsGuest(guest)
+      if (!loading && !guest) router.replace("/login")
+    }
   }, [user, loading])
 
   useEffect(() => {
@@ -147,9 +224,12 @@ export default function Dashboard() {
 
   const handleLogout = async () => { await signOut(); router.push("/login") }
 
-  const fullName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "there"
+  const fullName  = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "there"
   const firstName = fullName.split(" ")[0]
   const initials  = fullName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+
+  function openMood(id) { setMoodOverlay(id); setOverlayState(1) }
+  function closeOverlay() { setMoodOverlay(null); setOverlayState(1) }
 
   function startBreathe() {
     if (breatheActive) return
@@ -159,239 +239,166 @@ export default function Dashboard() {
       if (i >= BREATHE_STEPS.length) {
         setBreatheText("tap to begin a 4·7·8 cycle"); setBreatheActive(false); return
       }
-      const step = BREATHE_STEPS[i]
-      setBreatheText(step.text)
-      setTimeout(() => { i++; next() }, step.ms)
+      setBreatheText(BREATHE_STEPS[i].text)
+      setTimeout(() => { i++; next() }, BREATHE_STEPS[i - 1]?.ms ?? 4000)
     }
     next()
   }
 
-  const bg     = BG_MAP[activeMood]    || BG_MAP.default
-  const footer = FOOTER_MAP[activeMood] || FOOTER_MAP.default
+  /* Overlay state derived values */
+  const overlayDef = moodOverlay ? MOOD_SCREENS[moodOverlay] : null
+  const isS1       = overlayState === 1
+  const st         = overlayDef ? (isS1 ? overlayDef.s1 : overlayDef.s2) : null
 
   return (
     <>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0}
 
+        /* ── Dashboard root — background is ALWAYS the default teal, never changes ── */
         .fb-root{
           font-family:var(--font-dm-sans),sans-serif;
-          background:${bg};min-height:100vh;color:#1a3a42;
-          transition:background .9s ease;display:flex;flex-direction:column;
-          overflow-x:hidden;
+          background:linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%);
+          min-height:100vh;color:#1a3a42;
+          display:flex;flex-direction:column;overflow-x:hidden;
         }
         .fb-wrapper{display:flex;flex:1;position:relative}
 
-        /* ── SIDEBAR base (mobile overlay) ─────────────────── */
+        /* ── Mood overlay animations ───────────────────────────────────────────── */
+        @keyframes fbFloat{0%{transform:translateY(12px);opacity:0}25%{opacity:.85}100%{transform:translateY(-70px);opacity:0}}
+        @keyframes fbRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+        @keyframes fishBob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-14px) rotate(4deg)}}
+        .fb-overlay-content{animation:fbRise .5s ease both}
+
+        /* ── SIDEBAR base ──────────────────────────────────────────────────────── */
         .fb-sidebar{
           background:rgba(255,255,255,.8);backdrop-filter:blur(10px);
           width:280px;display:none;flex-direction:column;
           border-right:1px solid rgba(255,255,255,.5);
           position:relative;z-index:100;
         }
-        .fb-sidebar-overlay{
-          position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;z-index:90;
-        }
+        .fb-sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;z-index:90}
         @media(max-width:1023px){
           .fb-sidebar-overlay.open{display:block}
-          .fb-sidebar.open{
-            display:flex;position:fixed;top:0;left:0;
-            width:280px;height:100vh;z-index:100;
-          }
+          .fb-sidebar.open{display:flex;position:fixed;top:0;left:0;width:280px;height:100vh;z-index:100}
         }
-        .fb-sidebar-top{padding:28px;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0}
+        .fb-sidebar-top{padding:36px;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0}
         .fb-sidebar-close{display:flex;justify-content:flex-end;margin-bottom:16px}
-        .fb-sidebar-close-btn{
-          background:none;border:none;font-size:24px;cursor:pointer;
-          color:#1a3a42;padding:0;width:24px;height:24px;display:none;
-        }
+        .fb-sidebar-close-btn{background:none;border:none;font-size:30px;cursor:pointer;color:#1a3a42;padding:0;width:30px;height:30px;display:none}
         @media(max-width:1023px){.fb-sidebar-close-btn{display:block}}
-        .fb-profile{display:flex;align-items:flex-start;gap:14px;margin-bottom:24px}
-        .fb-profile-avatar{
-          width:56px;height:56px;border-radius:50%;
-          background:linear-gradient(135deg,#7ac4d0,#5aaabb);
-          display:flex;align-items:center;justify-content:center;
-          color:#fff;font-size:18px;font-weight:600;flex-shrink:0;
-        }
+        .fb-profile{display:flex;align-items:flex-start;gap:18px;margin-bottom:28px}
+        .fb-profile-avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#7ac4d0,#5aaabb);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:600;flex-shrink:0}
         .fb-profile-info{flex:1}
-        .fb-profile-name{font-size:18px;color:#0f2e35;font-weight:500}
-        .fb-profile-action{font-size:13px;color:#4a8a96;cursor:pointer;text-decoration:underline}
-        .fb-anon-toggle{display:flex;align-items:center;gap:14px;padding:14px 0;margin-bottom:24px}
-        .fb-anon-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .fb-anon-label{font-size:15px;color:#1a3a42;flex:1}
-        .fb-toggle{width:48px;height:26px;background:#d0d0d0;border-radius:13px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}
+        .fb-profile-name{font-size:32px;color:#0f2e35;font-weight:500}
+        .fb-profile-action{font-size:22px;color:#4a8a96;cursor:pointer;text-decoration:underline;margin-top:4px}
+        .fb-anon-toggle{display:flex;align-items:center;gap:16px;padding:16px 0;margin-bottom:24px}
+        .fb-anon-icon{width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .fb-anon-label{font-size:26px;color:#1a3a42;flex:1}
+        .fb-toggle{width:58px;height:32px;background:#d0d0d0;border-radius:16px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}
         .fb-toggle.on{background:#7ac4d0}
-        .fb-toggle-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:left .3s}
-        .fb-toggle.on .fb-toggle-thumb{left:25px}
-        .fb-sidebar-middle{flex:1;padding:0 28px;overflow-y:auto}
-        .fb-sidebar-section{margin-bottom:28px}
-        .fb-sidebar-section-label{
-          font-size:13px;letter-spacing:1.5px;text-transform:uppercase;
-          color:#4a8a96;font-weight:500;margin-bottom:14px;
-          display:flex;align-items:center;gap:8px;
-        }
-        .fb-mood-dots{display:flex;gap:10px}
-        .fb-mood-dot{width:24px;height:24px;border-radius:50%;background:#ccc;cursor:pointer;transition:transform .2s}
+        .fb-toggle-thumb{position:absolute;top:4px;left:4px;width:24px;height:24px;background:#fff;border-radius:50%;transition:left .3s}
+        .fb-toggle.on .fb-toggle-thumb{left:30px}
+        .fb-sidebar-middle{flex:1;padding:0 36px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+        .fb-sidebar-middle::-webkit-scrollbar{display:none}
+        .fb-sidebar-section{margin-bottom:34px}
+        .fb-sidebar-section-label{font-size:24px;letter-spacing:.3px;text-transform:uppercase;color:#4a8a96;font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+        .fb-mood-dots{display:flex;gap:12px}
+        .fb-mood-dot{width:32px;height:32px;border-radius:50%;background:#ccc;cursor:pointer;transition:transform .2s}
         .fb-mood-dot:hover{transform:scale(1.15)}
-        .fb-history-item{
-          display:flex;align-items:center;justify-content:space-between;
-          padding:14px;background:rgba(255,255,255,.5);border-radius:8px;
-          cursor:pointer;font-size:16px;color:#1a3a42;
-        }
+        .fb-history-item{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:rgba(255,255,255,.5);border-radius:12px;cursor:pointer;font-size:26px;color:#1a3a42}
         .fb-history-item:hover{background:rgba(255,255,255,.8)}
-        .fb-lock-icon{width:18px;height:18px}
-        .fb-sidebar-bottom{padding:28px;border-top:1px solid rgba(0,0,0,.08);flex-shrink:0}
-        .fb-logout{font-size:16px;color:#4a8a96;cursor:pointer;display:flex;align-items:center;gap:8px}
+        .fb-lock-icon{width:24px;height:24px}
+        .fb-sidebar-bottom{padding:32px 36px;border-top:1px solid rgba(0,0,0,.08);flex-shrink:0}
+        .fb-logout{font-size:26px;color:#4a8a96;cursor:pointer;display:flex;align-items:center;gap:12px}
 
-        /* ── NAVBAR ─────────────────────────────────────────── */
+        /* ── NAVBAR ────────────────────────────────────────────────────────────── */
         .fb-navbar{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;flex-shrink:0}
         @media(min-width:768px){.fb-navbar{padding:24px 48px}}
         .fb-logo-wrap{display:flex;align-items:center;gap:12px}
         .fb-hamburger{display:flex;flex-direction:column;gap:5px;cursor:pointer}
         .fb-hamburger span{display:block;width:22px;height:1.5px;background:#2a5a66;border-radius:2px}
-        .fb-logo{
-          display:flex;align-items:center;gap:8px;
-          font-family:var(--font-dm-serif),serif;
-          font-size:18px;color:#1a3a42;letter-spacing:-.3px;
-        }
+        .fb-logo{display:flex;align-items:center;gap:8px;font-family:var(--font-dm-serif),serif;font-size:18px;color:#1a3a42;letter-spacing:-.3px}
         .fb-time{font-size:14px;color:#2a5a66;font-weight:300;font-style:italic}
 
-        /* ── MAIN ───────────────────────────────────────────── */
+        /* ── MAIN ──────────────────────────────────────────────────────────────── */
         .fb-main{flex:1;padding:24px;overflow-y:auto}
         @media(min-width:768px){.fb-main{padding:32px 48px}}
 
-        .fb-greeting{
-          font-family:var(--font-dm-serif),serif;font-size:42px;
-          color:#0f2e35;font-weight:400;line-height:1.1;
-          margin-bottom:4px;letter-spacing:-1px;
-        }
+        .fb-greeting{font-family:var(--font-dm-serif),serif;font-size:42px;color:#0f2e35;font-weight:400;line-height:1.1;margin-bottom:4px;letter-spacing:-1px}
         @media(min-width:768px){.fb-greeting{font-size:56px;margin-bottom:8px;letter-spacing:-1.5px}}
         .fb-subgreeting{font-size:16px;color:#3a6a75;font-weight:300;margin-bottom:32px}
         @media(min-width:768px){.fb-subgreeting{font-size:18px;margin-bottom:40px}}
 
-        /* ── CHECK-IN CARD ──────────────────────────────────── */
-        .fb-checkin-card{
-          background:rgba(255,255,255,.65);border-radius:32px;padding:32px 24px;
-          border:.5px solid rgba(255,255,255,.95);backdrop-filter:blur(10px);margin-bottom:24px;
-        }
+        /* ── CHECK-IN CARD ─────────────────────────────────────────────────────── */
+        .fb-checkin-card{background:rgba(255,255,255,.65);border-radius:32px;padding:32px 24px;border:.5px solid rgba(255,255,255,.95);backdrop-filter:blur(10px);margin-bottom:24px}
         @media(min-width:768px){.fb-checkin-card{padding:40px 32px;margin-bottom:28px}}
-        .fb-checkin-label{
-          display:flex;align-items:center;gap:6px;font-size:11px;
-          letter-spacing:2px;text-transform:uppercase;color:#4a8a96;font-weight:500;margin-bottom:12px;
-        }
-        .fb-checkin-heading{
-          font-family:var(--font-dm-serif),serif;font-size:28px;
-          color:#0f2e35;line-height:1.2;margin-bottom:12px;font-weight:400;
-        }
+        .fb-checkin-label{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4a8a96;font-weight:500;margin-bottom:12px}
+        .fb-checkin-heading{font-family:var(--font-dm-serif),serif;font-size:28px;color:#0f2e35;line-height:1.2;margin-bottom:12px;font-weight:400}
         @media(min-width:768px){.fb-checkin-heading{font-size:32px;margin-bottom:16px}}
         .fb-checkin-hint{font-size:15px;color:#5a8a96;font-weight:300;font-style:italic;margin-bottom:28px}
 
-        /* ── MOOD GRID (mobile/tablet) ──────────────────────── */
+        /* ── MOOD GRID (mobile/tablet) ─────────────────────────────────────────── */
         .fb-moods-grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center}
         @media(min-width:768px){.fb-moods-grid{gap:24px}}
-        .fb-mood-btn{
-          border:none;background:none;cursor:pointer;
-          display:flex;flex-direction:column;align-items:center;justify-content:center;
-          gap:8px;transition:transform .2s ease,filter .2s ease;
-          padding:0;border-radius:50%;position:relative;
-          width:130px;height:120px;flex-shrink:0;
-        }
+        .fb-mood-btn{border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:transform .2s ease,filter .2s ease;padding:0;border-radius:50%;position:relative;width:130px;height:120px;flex-shrink:0}
         @media(min-width:768px){.fb-mood-btn{width:160px;height:140px}}
         .fb-mood-btn:hover{transform:scale(1.08);filter:brightness(1.1)}
         .fb-mood-btn:focus{outline:2px solid rgba(255,255,255,.6);outline-offset:4px}
         .fb-mood-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;opacity:.9}
         .fb-mood-label{font-size:13px;font-weight:400;letter-spacing:.5px;white-space:nowrap}
 
-        /* ── BREATHE CARD ───────────────────────────────────── */
-        .fb-breathe-card{
-          background:rgba(255,255,255,.65);border-radius:32px;padding:40px 28px;
-          display:flex;flex-direction:column;align-items:center;
-          margin-bottom:24px;border:.5px solid rgba(255,255,255,.95);
-          backdrop-filter:blur(10px);width:100%;
-        }
+        /* ── BREATHE CARD ──────────────────────────────────────────────────────── */
+        .fb-breathe-card{background:rgba(255,255,255,.65);border-radius:32px;padding:40px 28px;display:flex;flex-direction:column;align-items:center;margin-bottom:24px;border:.5px solid rgba(255,255,255,.95);backdrop-filter:blur(10px);width:100%}
         @media(min-width:768px){.fb-breathe-card{margin-bottom:28px}}
-        .fb-breathe-outer{
-          width:160px;height:160px;border-radius:50%;
-          background:rgba(178,220,230,.3);display:flex;align-items:center;
-          justify-content:center;margin-bottom:20px;
-          animation:breathePulse 6s ease-in-out infinite;
-        }
-        .fb-breathe-inner{
-          width:110px;height:110px;border-radius:50%;
-          background:linear-gradient(145deg,#6ab4c2,#4a9aac);
-          display:flex;align-items:center;justify-content:center;
-          cursor:pointer;transition:transform .2s;
-        }
+        .fb-breathe-outer{width:160px;height:160px;border-radius:50%;background:rgba(178,220,230,.3);display:flex;align-items:center;justify-content:center;margin-bottom:20px;animation:breathePulse 6s ease-in-out infinite}
+        .fb-breathe-inner{width:110px;height:110px;border-radius:50%;background:linear-gradient(145deg,#6ab4c2,#4a9aac);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .2s}
         .fb-breathe-inner:hover{transform:scale(1.05)}
         @keyframes breathePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
         .fb-breathe-label{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#3a7a88;font-weight:500;margin-bottom:6px}
         .fb-breathe-hint{font-size:16px;color:#4a8a96;font-weight:300}
 
-        /* ── WHISPER CARD ───────────────────────────────────── */
-        .fb-whisper-card{
-          background:rgba(255,255,255,.65);border-radius:32px;padding:20px 24px;
-          display:flex;align-items:center;gap:16px;margin-bottom:24px;
-          border:.5px solid rgba(255,255,255,.95);cursor:pointer;
-          width:100%;backdrop-filter:blur(10px);transition:background .2s;
-        }
+        /* ── WHISPER CARD ──────────────────────────────────────────────────────── */
+        .fb-whisper-card{background:rgba(255,255,255,.65);border-radius:32px;padding:20px 24px;display:flex;align-items:center;gap:16px;margin-bottom:24px;border:.5px solid rgba(255,255,255,.95);cursor:pointer;width:100%;backdrop-filter:blur(10px);transition:background .2s}
         @media(min-width:768px){.fb-whisper-card{padding:24px 32px;gap:20px;margin-bottom:28px}}
         .fb-whisper-card:hover{background:rgba(255,255,255,.82)}
-        .fb-whisper-icon{
-          width:50px;height:50px;border-radius:14px;
-          background:rgba(178,220,230,.4);
-          display:flex;align-items:center;justify-content:center;flex-shrink:0;
-        }
+        .fb-whisper-icon{width:50px;height:50px;border-radius:14px;background:rgba(178,220,230,.4);display:flex;align-items:center;justify-content:center;flex-shrink:0}
         @media(min-width:768px){.fb-whisper-icon{width:54px;height:54px}}
         .fb-whisper-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4a8a96;font-weight:500;margin-bottom:3px}
         .fb-whisper-desc{font-size:16px;color:#1a3a42}
-        .fb-open-btn{
-          background:#3a7a88;color:#fff;border:none;border-radius:24px;
-          padding:10px 24px;font-size:14px;font-family:var(--font-dm-sans),sans-serif;
-          cursor:pointer;white-space:nowrap;margin-left:auto;transition:background .2s;
-        }
+        .fb-open-btn{background:#3a7a88;color:#fff;border:none;border-radius:24px;padding:10px 24px;font-size:14px;font-family:var(--font-dm-sans),sans-serif;cursor:pointer;white-space:nowrap;margin-left:auto;transition:background .2s}
         .fb-open-btn:hover{background:#2a6070}
 
-        /* ── WIND-DOWN CARD ─────────────────────────────────── */
-        .fb-winddown-card{
-          background:rgba(255,255,255,.65);border-radius:32px;padding:28px 20px;
-          display:flex;flex-direction:column;gap:20px;margin-bottom:24px;
-          border:.5px solid rgba(255,255,255,.95);width:100%;backdrop-filter:blur(10px);
-        }
+        /* ── WIND-DOWN CARD ────────────────────────────────────────────────────── */
+        .fb-winddown-card{background:rgba(255,255,255,.65);border-radius:32px;padding:28px 20px;display:flex;flex-direction:column;gap:20px;margin-bottom:24px;border:.5px solid rgba(255,255,255,.95);width:100%;backdrop-filter:blur(10px)}
         @media(min-width:768px){.fb-winddown-card{padding:32px 40px;flex-direction:row;gap:32px;align-items:center}}
         .fb-winddown-label{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4a8a96;font-weight:500;margin-bottom:8px}
         .fb-winddown-title{font-family:var(--font-dm-serif),serif;font-size:24px;color:#0f2e35;margin-bottom:4px;font-weight:400}
         @media(min-width:768px){.fb-winddown-title{font-size:28px}}
         .fb-winddown-sub{font-size:14px;color:#5a8a96;margin-bottom:16px;font-style:italic}
         .fb-winddown-actions{display:flex;align-items:center;gap:16px}
-        .fb-play-btn{
-          display:flex;align-items:center;gap:8px;background:#1a3a42;color:#fff;
-          border:none;border-radius:24px;padding:10px 22px;font-size:14px;
-          font-family:var(--font-dm-sans),sans-serif;cursor:pointer;transition:background .2s;
-        }
+        .fb-play-btn{display:flex;align-items:center;gap:8px;background:#1a3a42;color:#fff;border:none;border-radius:24px;padding:10px 22px;font-size:14px;font-family:var(--font-dm-sans),sans-serif;cursor:pointer;transition:background .2s}
         .fb-play-btn:hover{background:#0f2e35}
         .fb-browse-link{font-size:14px;color:#4a8a96;cursor:pointer;text-decoration:underline}
-        .fb-blob{
-          width:110px;height:110px;border-radius:50%;
-          background:linear-gradient(145deg,#7ac4d0,#5aaabb);flex-shrink:0;
-        }
+        .fb-blob{width:110px;height:110px;border-radius:50%;background:linear-gradient(145deg,#7ac4d0,#5aaabb);flex-shrink:0}
         @media(min-width:768px){.fb-blob{width:130px;height:130px;margin-left:auto}}
 
-        /* ── FOOTER ─────────────────────────────────────────── */
+        /* ── FOOTER ────────────────────────────────────────────────────────────── */
         .fb-footer{text-align:center;padding:20px 16px 32px;font-size:14px;color:#4a8a96;font-style:italic;font-weight:300;letter-spacing:.3px;flex-shrink:0}
         @media(min-width:768px){.fb-footer{padding:20px 48px 40px;font-size:15px}}
 
-        /* ══════════════════════════════════════════════════════
-           DESKTOP ≥1024px — ALL CHANGES BELOW THIS LINE
-           ══════════════════════════════════════════════════════ */
+        /* ══════════════════════════════════════════════════════════════════════════
+           DESKTOP ≥1024px — all changes below, mobile/tablet untouched above
+           ══════════════════════════════════════════════════════════════════════════ */
         @media(min-width:1024px){
 
-          /* Hamburger stays visible (opens drawer) */
-          .fb-hamburger{display:flex}
+          /* Hamburger — bigger lines */
+          .fb-hamburger{display:flex;gap:8px}
+          .fb-hamburger span{width:38px;height:3px;border-radius:3px}
 
-          /* Sidebar → fixed drawer on desktop */
+          /* Sidebar → fixed drawer */
           .fb-sidebar{
             display:none;position:fixed;top:0;left:0;z-index:200;
-            width:342px;height:100%;flex-direction:column;
+            width:480px;height:100%;flex-direction:column;
             background:linear-gradient(180deg,#dceef2,#cde7ed);
             box-shadow:24px 0 60px rgba(40,90,105,.16);
             padding:28px 28px 24px;overflow-y:auto;border-right:none;
@@ -400,27 +407,30 @@ export default function Dashboard() {
           .fb-sidebar-overlay.open{display:block}
           .fb-sidebar-close-btn{display:block}
 
-          /* Wrapper: block (no side-by-side column) */
+          /* Block layout (no sidebar column) */
           .fb-wrapper{display:block}
 
-          /* Navbar: centered strip */
-          .fb-navbar{max-width:1180px;margin:0 auto;padding:30px 56px 0}
+          /* Navbar — left-anchored, logo and hamburger pushed to left edge */
+          .fb-navbar{
+            padding:32px clamp(48px,6vw,120px) 0 40px;
+            justify-content:flex-start;
+          }
+          .fb-logo-wrap{gap:22px}
+          .fb-logo{font-size:34px;font-weight:600;letter-spacing:-.5px;color:#2f3e45;gap:14px}
+          .fb-logo svg{width:42px;height:42px}
+          .fb-time{font-style:italic;color:#7693a0;font-size:17px;margin-left:auto}
 
-          /* Logo sizing */
-          .fb-logo{font-size:23px;font-weight:600;letter-spacing:-.3px;color:#2f3e45}
-          .fb-time{font-style:italic;color:#7693a0;font-size:17px}
-
-          /* Main: centered, no extra padding top */
+          /* Main — full width, same scaled padding, no max-width constraint */
           .fb-main{
-            max-width:1180px;margin:0 auto;
-            padding:0 56px 0;overflow:visible;
+            padding:0 clamp(48px,6vw,120px) 0;
+            overflow:visible;
           }
 
           /* Greeting */
           .fb-greeting{font-size:66px;line-height:1;color:#2f3e45;margin-top:58px;margin-bottom:0;letter-spacing:0}
           .fb-subgreeting{font-size:22px;color:#7c9098;font-weight:300;margin-top:16px;margin-bottom:0}
 
-          /* Floating island check-in */
+          /* Floating island — bleeds off the right edge */
           .fb-checkin-card{
             margin:46px -150px 0 0;
             border-radius:60px 0 0 60px;
@@ -455,17 +465,10 @@ export default function Dashboard() {
             backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
             box-shadow:0 14px 40px rgba(70,130,150,.1);border:none;
           }
-          .fb-whisper-icon{
-            width:56px;height:56px;border-radius:50%;
-            background:#bfe0e8;flex-shrink:0;
-          }
+          .fb-whisper-icon{width:56px;height:56px;border-radius:50%;background:#bfe0e8;flex-shrink:0}
           .fb-whisper-label{font-size:12.5px;letter-spacing:2.2px;color:#8aa6ad}
           .fb-whisper-desc{font-size:21px;color:#3c4f57;font-weight:300;margin-top:5px}
-          .fb-open-btn{
-            background:linear-gradient(135deg,#5fa0ac,#7bbac4);
-            font-size:15px;padding:11px 28px;
-            box-shadow:0 8px 20px rgba(95,160,172,.35);
-          }
+          .fb-open-btn{background:linear-gradient(135deg,#5fa0ac,#7bbac4);font-size:15px;padding:11px 28px;box-shadow:0 8px 20px rgba(95,160,172,.35)}
 
           /* Wind-down card */
           .fb-winddown-card{
@@ -478,18 +481,9 @@ export default function Dashboard() {
           .fb-winddown-label{font-size:12.5px;letter-spacing:2.2px;color:#8aa6ad}
           .fb-winddown-title{font-size:32px}
           .fb-winddown-sub{font-size:16px}
-          .fb-play-btn{
-            display:flex;align-items:center;gap:9px;
-            background:#2f3e45;color:#eef4f5;
-            font-size:15px;padding:11px 24px;border-radius:30px;
-          }
+          .fb-play-btn{background:#2f3e45;color:#eef4f5;font-size:15px;padding:11px 24px;border-radius:30px}
           .fb-browse-link{font-size:15px}
-          .fb-blob{
-            width:150px;height:150px;
-            background:radial-gradient(circle at 38% 34%,#cfeaf0,#a6d2dc);
-            box-shadow:0 14px 34px rgba(120,180,195,.32);
-            margin-left:auto;flex-shrink:0;
-          }
+          .fb-blob{width:150px;height:150px;background:radial-gradient(circle at 38% 34%,#cfeaf0,#a6d2dc);box-shadow:0 14px 34px rgba(120,180,195,.32);margin-left:auto;flex-shrink:0}
 
           /* Footer */
           .fb-footer{padding:54px 0 66px;font-size:16.5px;color:#7c9098}
@@ -498,7 +492,7 @@ export default function Dashboard() {
 
       <div className="fb-root">
 
-        {/* ── NAVBAR ─────────────────────────────────────────── */}
+        {/* ── NAVBAR ─────────────────────────────────────────────────────────── */}
         <nav className="fb-navbar">
           <div className="fb-logo-wrap">
             <div className="fb-hamburger" onClick={() => setSidebarOpen(o => !o)}>
@@ -520,17 +514,27 @@ export default function Dashboard() {
           {/* overlay */}
           <div className={`fb-sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
-          {/* ── SIDEBAR ──────────────────────────────────────── */}
+          {/* ── SIDEBAR ────────────────────────────────────────────────────── */}
           <aside className={`fb-sidebar ${sidebarOpen ? "open" : ""}`}>
             <div className="fb-sidebar-top">
               <div className="fb-sidebar-close">
                 <button className="fb-sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
               </div>
               <div className="fb-profile">
-                <div className="fb-profile-avatar">{isGuest ? "👤" : initials}</div>
+                <div className="fb-profile-avatar" style={anonymousMode ? { background:"linear-gradient(135deg,#6b7fa8,#4a5a80)" } : {}}>
+                  {anonymousMode
+                    ? <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+                        <circle cx="16" cy="8" r="3.5" fill="rgba(255,255,255,.95)"/>
+                        <circle cx="16" cy="8" r="5.5" fill="rgba(255,255,255,.18)"/>
+                        <path d="M13.5 10.5 Q9 13 5 17" stroke="rgba(255,255,255,.75)" strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M13 11.5 Q8.5 14.5 4.5 18.5" stroke="rgba(255,255,255,.45)" strokeWidth="1.4" strokeLinecap="round"/>
+                        <path d="M14 11 Q9.5 13.5 6 17" stroke="rgba(255,255,255,.25)" strokeWidth="1" strokeLinecap="round"/>
+                      </svg>
+                    : isGuest ? "👤" : initials}
+                </div>
                 <div className="fb-profile-info">
-                  <div className="fb-profile-name">{isGuest ? "guest" : fullName}</div>
-                  <div className="fb-profile-action">{isGuest ? "not saved" : "tap for settings"}</div>
+                  <div className="fb-profile-name">{anonymousMode ? "soul" : isGuest ? "guest" : firstName}</div>
+                  <div className="fb-profile-action">{anonymousMode ? "hidden from view" : isGuest ? "not saved" : "tap for settings"}</div>
                 </div>
               </div>
               <div className="fb-anon-toggle">
@@ -561,7 +565,6 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
-
               <div className="fb-sidebar-section">
                 <div className="fb-sidebar-section-label">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -578,7 +581,6 @@ export default function Dashboard() {
                   </svg>
                 </div>
               </div>
-
               <div className="fb-sidebar-section">
                 <div className="fb-sidebar-section-label">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -588,15 +590,10 @@ export default function Dashboard() {
                 </div>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                   {["ocean waves","rain","forest","silence"].map((s, i) => (
-                    <span key={i} style={{
-                      background: i === 0 ? "#5eb4c2" : "rgba(255,255,255,.6)",
-                      color: i === 0 ? "#fff" : "#4a5d64",
-                      fontSize: "12.5px", padding: "5px 13px", borderRadius: 20, cursor: "pointer"
-                    }}>{s}</span>
+                    <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:"22px", padding:"9px 20px", borderRadius:24, cursor:"pointer" }}>{s}</span>
                   ))}
                 </div>
               </div>
-
               <div className="fb-sidebar-section">
                 <div className="fb-sidebar-section-label">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
@@ -606,12 +603,11 @@ export default function Dashboard() {
                   settings
                 </div>
               </div>
+              <div style={{ background:"rgba(255,255,255,.55)", borderRadius:18, padding:"22px 24px", fontSize:26, lineHeight:1.4, color:"#46606a", display:"flex", alignItems:"flex-start", gap:12, marginBottom:24 }}>
+                🌸 you&#39;ve checked in 4 days this week.
+              </div>
             </div>
 
-            <div style={{ flex:1, minHeight:20 }} />
-            <div style={{ background:"rgba(255,255,255,.5)", borderRadius:16, padding:"12px 15px", fontSize:13.5, color:"#46606a", display:"flex", alignItems:"center", gap:9 }}>
-              🌸 you&#39;ve checked in 4 days this week.
-            </div>
             <div className="fb-sidebar-bottom">
               <div className="fb-logout" onClick={handleLogout}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -622,7 +618,7 @@ export default function Dashboard() {
             </div>
           </aside>
 
-          {/* ── MAIN CONTENT ─────────────────────────────────── */}
+          {/* ── MAIN CONTENT ───────────────────────────────────────────────── */}
           <div className="fb-main">
             <p className="fb-greeting">{anonymousMode ? "hello there," : `hello ${firstName},`}</p>
             <p className="fb-subgreeting">{getSubGreeting()}</p>
@@ -640,29 +636,27 @@ export default function Dashboard() {
               </h2>
               <p className="fb-checkin-hint">pick one. nothing shifts unless you&#39;re ready.</p>
 
-              {/* MOOD CLUSTER — desktop: absolute organic blobs, mobile: flex grid */}
+              {/* MOOD CLUSTER — desktop: absolute organic blobs | mobile: flex grid */}
               {isDesktop ? (
                 <div className="fb-moods-cluster-desktop">
                   {DESKTOP_BLOBS.map(blob => (
                     <div
                       key={blob.id}
-                      onClick={() => setActiveMood(blob.id)}
+                      onClick={() => openMood(blob.id)}
                       style={{
                         position:"absolute", left:blob.left, top:blob.top,
                         width:blob.width, height:blob.height,
                         borderRadius:blob.borderRadius,
                         background:blob.background,
-                        boxShadow: activeMood === blob.id
-                          ? `${blob.shadow}, 0 0 0 3px rgba(255,255,255,.6)`
-                          : blob.shadow,
+                        boxShadow:blob.shadow,
                         cursor:"pointer",
                         display:"flex", flexDirection:"column",
                         alignItems:"center", justifyContent:"center",
                         transition:"transform .45s ease, box-shadow .45s ease",
                         color:blob.color,
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.035)" }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)" }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.035)"; e.currentTarget.style.boxShadow = blob.shadow + ", 0 0 0 3px rgba(255,255,255,.4)" }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = blob.shadow }}
                     >
                       <BlobIcon id={blob.id} size={blob.iconSize} />
                       <div style={{ marginTop:14, fontSize:20, fontWeight:400 }}>{blob.label}</div>
@@ -671,22 +665,22 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="fb-moods-grid">
-                  {MOODS.map(mood => (
-                    <button
-                      key={mood.id}
-                      onClick={() => setActiveMood(mood.id)}
-                      className="fb-mood-btn"
-                      style={{ backgroundColor: mood.color }}
-                      aria-pressed={activeMood === mood.id}
-                    >
-                      <div className="fb-mood-icon" style={{ color: mood.textColor }}>
+                  {[
+                    { id:"empty",       label:"empty",       color:"#515d6e" },
+                    { id:"overwhelmed", label:"overwhelmed", color:"#0a6878" },
+                    { id:"okayish",     label:"okay-ish",    color:"#7a8a5a" },
+                    { id:"heavy",       label:"heavy",       color:"#1a1060" },
+                    { id:"full",        label:"full",        color:"#d07030" },
+                  ].map(mood => (
+                    <button key={mood.id} onClick={() => openMood(mood.id)} className="fb-mood-btn" style={{ backgroundColor: mood.color }}>
+                      <div className="fb-mood-icon" style={{ color:"#fff" }}>
                         {mood.id === "empty"       && <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="16" cy="12" r="4"/><path d="M8 24 Q16 18 24 24"/><path d="M6 27 Q16 21 26 27"/></svg>}
                         {mood.id === "overwhelmed" && <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4 14 Q10 10 16 14 Q22 18 28 14"/><path d="M4 20 Q10 16 16 20 Q22 24 28 20"/><circle cx="16" cy="8" r="2.5"/></svg>}
                         {mood.id === "okayish"     && <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="16" cy="12" r="6"/><path d="M10 6 L16 2 L22 6"/><path d="M8 20 L24 20"/></svg>}
                         {mood.id === "heavy"       && <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M16 4 Q20 12 16 20 Q14 24 16 28"/><ellipse cx="16" cy="28" rx="4" ry="2"/></svg>}
                         {mood.id === "full"        && <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="16" cy="16" r="5"/><path d="M16 2 L16 6M16 26 L16 30M2 16 L6 16M26 16 L30 16M6.3 6.3 L9.2 9.2M22.8 22.8 L25.7 25.7M25.7 6.3 L22.8 9.2M9.2 22.8 L6.3 25.7"/></svg>}
                       </div>
-                      <span className="fb-mood-label" style={{ color: mood.textColor }}>{mood.label}</span>
+                      <span className="fb-mood-label" style={{ color:"#fff" }}>{mood.label}</span>
                     </button>
                   ))}
                 </div>
@@ -694,9 +688,9 @@ export default function Dashboard() {
             </div>
 
             {/* BREATHE CARD */}
-            <div className="fb-breathe-card" onClick={isDesktop ? startBreathe : undefined}>
+            <div className="fb-breathe-card">
               <div className="fb-breathe-outer">
-                <div className="fb-breathe-inner" onClick={!isDesktop ? startBreathe : undefined}>
+                <div className="fb-breathe-inner" onClick={startBreathe}>
                   <svg viewBox="0 0 28 28" width="26" height="26" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
                     <path d="M3 9h11a2.5 2.5 0 1 0-2.5-2.5"/>
                     <path d="M3 14h14a2.5 2.5 0 1 1-2.5 2.5"/>
@@ -735,9 +729,7 @@ export default function Dashboard() {
                 <div className="fb-winddown-sub">&#34;the quiet harbor&#34; · narrated softly</div>
                 <div className="fb-winddown-actions">
                   <button className="fb-play-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                      <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     play
                   </button>
                   <span className="fb-browse-link">browse library</span>
@@ -748,8 +740,98 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="fb-footer">{footer}</div>
+        <div className="fb-footer">whatever you&#39;re feeling, it&#39;s welcome here.</div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          FULL-SCREEN MOOD OVERLAY — renders on top of everything, never inside
+          the dashboard layout, so dashboard background never changes
+          ══════════════════════════════════════════════════════════════════════ */}
+      {moodOverlay && overlayDef && st && (
+        <div style={{
+          position:"fixed", inset:0, zIndex:300,
+          background: st.bg,
+          color: st.fg,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          padding: "48px 24px",
+          textAlign:"center",
+          fontFamily:"var(--font-dm-sans),sans-serif",
+          transition:"background 0.7s ease",
+        }}>
+
+          {/* floating particles (full s2 only) */}
+          {st.showParticles && (
+            <div style={{ position:"absolute", inset:0, pointerEvents:"none", overflow:"hidden" }}>
+              {[
+                { l:"12%", t:"76%", w:10, d:0,    dur:7 },
+                { l:"30%", t:"90%", w:7,  d:0.8,  dur:9 },
+                { l:"62%", t:"82%", w:12, d:0.4,  dur:8,  c:"rgba(255,233,160,.85)" },
+                { l:"80%", t:"92%", w:8,  d:1.2,  dur:10 },
+                { l:"90%", t:"72%", w:9,  d:0.2,  dur:8.5, c:"rgba(255,210,120,.8)" },
+                { l:"48%", t:"94%", w:6,  d:1.6,  dur:11 },
+              ].map((p, i) => (
+                <span key={i} style={{
+                  position:"absolute", left:p.l, top:p.t,
+                  width:p.w, height:p.w, borderRadius:"50%",
+                  background: p.c || "rgba(255,255,255,.7)",
+                  animation:`fbFloat ${p.dur}s ease-in-out ${p.d}s infinite`,
+                }}/>
+              ))}
+            </div>
+          )}
+
+          {/* close button */}
+          <div
+            onClick={closeOverlay}
+            style={{ position:"absolute", top:30, right:36, cursor:"pointer", opacity:.55, display:"flex" }}
+          >
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M5 5l14 14M19 5L5 19"/>
+            </svg>
+          </div>
+
+          <div className="fb-overlay-content" style={{ position:"relative", maxWidth:860, display:"flex", flexDirection:"column", alignItems:"center", padding:"0 32px" }}>
+            <div style={{ color:st.accent, marginBottom:40, display:"flex", justifyContent:"center" }}>
+              <OverlayIcon icon={overlayDef.icon} color={st.accent} />
+            </div>
+
+            <div style={{ fontSize:"clamp(42px,5.5vw,68px)", fontWeight:300, lineHeight:1.1, letterSpacing:"-.8px" }}>
+              {st.head}
+            </div>
+
+            <div style={{ marginTop:28, fontSize:"clamp(22px,2.6vw,30px)", fontWeight:300, opacity:.85, lineHeight:1.65 }}>
+              {st.sub}
+            </div>
+
+            <div style={{ marginTop:56, display:"flex", flexDirection:"column", alignItems:"center", gap:18 }}>
+              {isS1 && overlayDef.s1.showSit && (
+                <div onClick={closeOverlay} style={{ background:"rgba(255,255,255,.35)", color:st.fg, padding:"16px 40px", borderRadius:34, cursor:"pointer", fontSize:22 }}>
+                  just sit here
+                </div>
+              )}
+              <div
+                onClick={isS1 ? () => setOverlayState(2) : closeOverlay}
+                style={{
+                  display:"flex", alignItems:"center", gap:12,
+                  background: isS1 ? st.accent : "rgba(255,255,255,.32)",
+                  color: isS1 ? "#fff" : st.fg,
+                  padding:"18px 48px", borderRadius:40, cursor:"pointer",
+                  fontSize:24, fontWeight:500,
+                  boxShadow:"0 14px 36px rgba(0,0,0,.15)",
+                }}
+              >
+                {isS1 ? "whenever you're ready" : "carry this with me"}
+                {isS1 && <span style={{ fontSize:22 }}>🌸</span>}
+              </div>
+              {isS1 && (
+                <div style={{ fontStyle:"italic", fontSize:20, opacity:.6, marginTop:4 }}>
+                  no rush. this stays as long as you need.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
