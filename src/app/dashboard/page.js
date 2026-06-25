@@ -932,7 +932,7 @@ export default function Dashboard() {
                     return (
                       <div
                         key={id}
-                        onClick={() => { closeOverlay(); router.push(act.route) }}
+                        onClick={() => { closeOverlay(); router.push(`${act.route}?mood=${moodOverlay}`) }}
                         style={{
                           display:"flex", alignItems:"center", gap:10,
                           background:"rgba(255,255,255,.22)",

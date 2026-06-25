@@ -54,3 +54,20 @@ export async function fetchLast7Days(userId) {
 
   return (data || []).map(row => row.mood)
 }
+
+/**
+ * Save a journal entry (spill, pages, canvas, etc.) to journal_entries.
+ * Silently skips for guests (userId falsy).
+ *
+ * @param {string} userId
+ * @param {{ activity: string, content: string, mood?: string }} entry
+ */
+export async function saveJournalEntry(userId, { activity, content, mood = null }) {
+  if (!userId) return
+
+  const { error } = await supabase
+    .from('journal_entries')
+    .insert({ user_id: userId, activity, content, mood })
+
+  if (error) console.error('[feelbetter] saveJournalEntry:', error.message)
+}
