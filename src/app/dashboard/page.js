@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { MOOD_ACTIVITIES, ACTIVITY_MAP } from "@/app/activities/data"
+import { saveMood, fetchLast7Days } from "@/lib/supabase"
 
 /* ── Mood overlay data (state 1 → state 2) ──────────────────── */
 const MOOD_SCREENS = {
@@ -205,12 +206,16 @@ export default function Dashboard() {
   const [anonymousMode, setAnonymousMode] = useState(false)
   const [isGuest,       setIsGuest]       = useState(false)
   const [clusterScale,  setClusterScale]  = useState(1)
+  const [moodHistory,   setMoodHistory]   = useState([])   // real data from Supabase
+  const [pageScale,     setPageScale]     = useState(1)
   const clusterWrapRef = useRef(null)
 
   useEffect(() => {
     if (user) {
       localStorage.removeItem("isGuest")
       setIsGuest(false)
+      // Load real mood history from Supabase whenever the user is available
+      fetchLast7Days(user.id).then(moods => setMoodHistory(moods))
     } else {
       const guest = localStorage.getItem("isGuest") === "true"
       setIsGuest(guest)
@@ -226,7 +231,13 @@ export default function Dashboard() {
       if (clusterWrapRef.current)
         setClusterScale(Math.min(1, clusterWrapRef.current.offsetWidth / 920))
     }
-    const check = () => { setIsDesktop(window.innerWidth >= 1024); measureCluster() }
+    const check = () => {
+      const w = window.innerWidth
+      setIsDesktop(w >= 1024)
+      measureCluster()
+      // scale the whole page so content fits at any desktop width without overflowing
+      setPageScale(w >= 1024 ? Math.min(1, w / 1920) : 1)
+    }
     check()
     window.addEventListener("resize", check)
     return () => { clearInterval(t); window.removeEventListener("resize", check) }
@@ -238,7 +249,16 @@ export default function Dashboard() {
   const firstName = fullName.split(" ")[0]
   const initials  = fullName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
 
-  function openMood(id) { setMoodOverlay(id); setOverlayState(1) }
+  function openMood(id) {
+    setMoodOverlay(id)
+    setOverlayState(1)
+    // Save to DB for logged-in, non-anonymous users; refresh sidebar dots after save
+    if (user && !anonymousMode) {
+      saveMood(user.id, id, 1).then(() =>
+        fetchLast7Days(user.id).then(moods => setMoodHistory(moods))
+      )
+    }
+  }
   function closeOverlay() { setMoodOverlay(null); setOverlayState(1) }
 
   function startBreathe() {
@@ -292,34 +312,34 @@ export default function Dashboard() {
           .fb-sidebar-overlay.open{display:block}
           .fb-sidebar.open{display:flex;position:fixed;top:0;left:0;width:280px;height:100vh;z-index:100}
         }
-        .fb-sidebar-top{padding:36px;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0}
-        .fb-sidebar-close{display:flex;justify-content:flex-end;margin-bottom:16px}
-        .fb-sidebar-close-btn{background:none;border:none;font-size:30px;cursor:pointer;color:#1a3a42;padding:0;width:30px;height:30px;display:none}
+        .fb-sidebar-top{padding:22px;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0}
+        .fb-sidebar-close{display:flex;justify-content:flex-end;margin-bottom:10px}
+        .fb-sidebar-close-btn{background:none;border:none;font-size:20px;cursor:pointer;color:#1a3a42;padding:0;width:22px;height:22px;display:none}
         @media(max-width:1023px){.fb-sidebar-close-btn{display:block}}
-        .fb-profile{display:flex;align-items:flex-start;gap:18px;margin-bottom:28px}
-        .fb-profile-avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#7ac4d0,#5aaabb);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:600;flex-shrink:0}
+        .fb-profile{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+        .fb-profile-avatar{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#7ac4d0,#5aaabb);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;flex-shrink:0}
         .fb-profile-info{flex:1}
-        .fb-profile-name{font-size:32px;color:#0f2e35;font-weight:500}
-        .fb-profile-action{font-size:22px;color:#4a8a96;cursor:pointer;text-decoration:underline;margin-top:4px}
-        .fb-anon-toggle{display:flex;align-items:center;gap:16px;padding:16px 0;margin-bottom:24px}
-        .fb-anon-icon{width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .fb-anon-label{font-size:26px;color:#1a3a42;flex:1}
-        .fb-toggle{width:58px;height:32px;background:#d0d0d0;border-radius:16px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}
+        .fb-profile-name{font-size:17px;color:#0f2e35;font-weight:500}
+        .fb-profile-action{font-size:13px;color:#4a8a96;cursor:pointer;text-decoration:underline;margin-top:3px}
+        .fb-anon-toggle{display:flex;align-items:center;gap:10px;padding:10px 0;margin-bottom:14px}
+        .fb-anon-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .fb-anon-label{font-size:14px;color:#1a3a42;flex:1}
+        .fb-toggle{width:44px;height:26px;background:#d0d0d0;border-radius:13px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}
         .fb-toggle.on{background:#7ac4d0}
-        .fb-toggle-thumb{position:absolute;top:4px;left:4px;width:24px;height:24px;background:#fff;border-radius:50%;transition:left .3s}
-        .fb-toggle.on .fb-toggle-thumb{left:30px}
-        .fb-sidebar-middle{flex:1;padding:0 36px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+        .fb-toggle-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:left .3s}
+        .fb-toggle.on .fb-toggle-thumb{left:21px}
+        .fb-sidebar-middle{flex:1;padding:0 22px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
         .fb-sidebar-middle::-webkit-scrollbar{display:none}
-        .fb-sidebar-section{margin-bottom:34px}
-        .fb-sidebar-section-label{font-size:24px;letter-spacing:.3px;text-transform:uppercase;color:#4a8a96;font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:10px}
-        .fb-mood-dots{display:flex;gap:12px}
-        .fb-mood-dot{width:32px;height:32px;border-radius:50%;background:#ccc;cursor:pointer;transition:transform .2s}
+        .fb-sidebar-section{margin-bottom:20px}
+        .fb-sidebar-section-label{font-size:12px;letter-spacing:.3px;text-transform:uppercase;color:#4a8a96;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .fb-mood-dots{display:flex;gap:8px;flex-wrap:wrap}
+        .fb-mood-dot{width:20px;height:20px;border-radius:50%;background:#ccc;cursor:pointer;transition:transform .2s}
         .fb-mood-dot:hover{transform:scale(1.15)}
-        .fb-history-item{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:rgba(255,255,255,.5);border-radius:12px;cursor:pointer;font-size:26px;color:#1a3a42}
+        .fb-history-item{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:rgba(255,255,255,.5);border-radius:10px;cursor:pointer;font-size:14px;color:#1a3a42}
         .fb-history-item:hover{background:rgba(255,255,255,.8)}
-        .fb-lock-icon{width:24px;height:24px}
-        .fb-sidebar-bottom{padding:32px 36px;border-top:1px solid rgba(0,0,0,.08);flex-shrink:0}
-        .fb-logout{font-size:26px;color:#4a8a96;cursor:pointer;display:flex;align-items:center;gap:12px}
+        .fb-lock-icon{width:16px;height:16px}
+        .fb-sidebar-bottom{padding:20px 22px;border-top:1px solid rgba(0,0,0,.08);flex-shrink:0}
+        .fb-logout{font-size:14px;color:#4a8a96;cursor:pointer;display:flex;align-items:center;gap:8px}
 
         /* ── NAVBAR ────────────────────────────────────────────────────────────── */
         .fb-navbar{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;flex-shrink:0}
@@ -402,16 +422,16 @@ export default function Dashboard() {
         @media(min-width:1024px){
 
           /* Hamburger — bigger lines */
-          .fb-hamburger{display:flex;gap:8px}
-          .fb-hamburger span{width:38px;height:3px;border-radius:3px}
+          .fb-hamburger{display:flex;gap:6px}
+          .fb-hamburger span{width:30px;height:2.5px;border-radius:3px}
 
           /* Sidebar → fixed drawer */
           .fb-sidebar{
             display:none;position:fixed;top:0;left:0;z-index:200;
-            width:480px;height:100%;flex-direction:column;
+            width:300px;height:100%;flex-direction:column;
             background:linear-gradient(180deg,#dceef2,#cde7ed);
             box-shadow:24px 0 60px rgba(40,90,105,.16);
-            padding:28px 28px 24px;overflow-y:auto;border-right:none;
+            padding:20px 20px 18px;overflow-y:auto;border-right:none;
           }
           .fb-sidebar.open{display:flex}
           .fb-sidebar-overlay.open{display:block}
@@ -422,85 +442,92 @@ export default function Dashboard() {
 
           /* Navbar — left-anchored, logo and hamburger pushed to left edge */
           .fb-navbar{
-            padding:32px clamp(48px,6vw,120px) 0 40px;
+            padding:22px clamp(32px,4vw,80px) 0 28px;
             justify-content:flex-start;
           }
-          .fb-logo-wrap{gap:22px}
-          .fb-logo{font-size:clamp(22px, 1.77vw, 34px);font-weight:600;letter-spacing:-.5px;color:#2f3e45;gap:14px}
-          .fb-logo svg{width:42px;height:42px}
+          .fb-logo-wrap{gap:16px}
+          .fb-logo{font-size:clamp(20px, 1.56vw, 28px);font-weight:600;letter-spacing:-.5px;color:#2f3e45;gap:12px}
+          .fb-logo svg{width:34px;height:34px}
           .fb-time{font-style:italic;color:#7693a0;font-size:clamp(18px, 1.35vw, 26px);margin-left:auto}
 
           /* Main — full width, same scaled padding, no max-width constraint */
           .fb-main{
-            padding:0 clamp(48px,6vw,120px) 0;
+            padding:0 clamp(32px,4vw,80px) 0;
             overflow:visible;
           }
 
           /* Greeting */
-          .fb-greeting{font-size:clamp(56px, 4.48vw, 86px);line-height:1;color:#2f3e45;margin-top:58px;margin-bottom:0;letter-spacing:0}
-          .fb-subgreeting{font-size:clamp(22px, 1.77vw, 34px);color:#7c9098;font-weight:300;margin-top:20px;margin-bottom:0}
+          .fb-greeting{font-size:clamp(44px, 3.54vw, 68px);line-height:1;color:#2f3e45;margin-top:40px;margin-bottom:0;letter-spacing:0}
+          .fb-subgreeting{font-size:clamp(18px, 1.46vw, 28px);color:#7c9098;font-weight:300;margin-top:14px;margin-bottom:0}
 
           /* Floating island — bleeds off the right edge */
           .fb-checkin-card{
-            margin:46px -150px 0 0;
-            border-radius:60px 0 0 60px;
-            padding:52px 68px 68px;margin-bottom:0;
+            margin:34px -120px 0 0;
+            border-radius:50px 0 0 50px;
+            padding:40px 54px 54px;margin-bottom:0;
             background:linear-gradient(180deg,rgba(255,255,255,.74),rgba(255,255,255,.5));
             backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
             box-shadow:0 24px 70px rgba(60,120,140,.13);border:none;
           }
-          .fb-checkin-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2px;color:#8aa6ad;margin-bottom:0}
-          .fb-checkin-heading{font-size:clamp(44px, 3.54vw, 68px);line-height:1.06;margin-top:20px;margin-bottom:0}
-          .fb-checkin-hint{font-size:clamp(20px, 1.61vw, 31px);font-weight:300;color:#8497a0;margin-top:20px;margin-bottom:0}
+          .fb-checkin-label{font-size:clamp(15px, 1.1vw, 20px);letter-spacing:2px;color:#8aa6ad;margin-bottom:0}
+          .fb-checkin-heading{font-size:clamp(36px, 2.92vw, 56px);line-height:1.06;margin-top:16px;margin-bottom:0}
+          .fb-checkin-hint{font-size:clamp(17px, 1.35vw, 26px);font-weight:300;color:#8497a0;margin-top:16px;margin-bottom:0}
 
           /* Desktop mood cluster */
           .fb-moods-cluster-desktop{position:relative;width:920px;height:600px;margin-top:34px}
 
           /* Breathe card */
           .fb-breathe-card{
-            margin-top:34px;margin-bottom:0;border-radius:36px;padding:56px;
+            margin-top:24px;margin-bottom:0;border-radius:30px;padding:44px;
             background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42));
             backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
             box-shadow:0 16px 44px rgba(70,130,150,.1);border:none;
           }
-          .fb-breathe-outer{width:200px;height:200px}
-          .fb-breathe-inner{width:200px;height:200px}
-          .fb-breathe-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2.5px;color:#7e98a0}
-          .fb-breathe-hint{font-size:clamp(22px, 1.77vw, 34px);color:#566970}
+          .fb-breathe-outer{width:170px;height:170px}
+          .fb-breathe-inner{width:116px;height:116px}
+          .fb-breathe-label{font-size:clamp(14px, 1.04vw, 20px);letter-spacing:2.5px;color:#7e98a0}
+          .fb-breathe-hint{font-size:clamp(17px, 1.46vw, 28px);color:#566970}
 
           /* Whisper card */
           .fb-whisper-card{
-            margin-top:28px;margin-bottom:0;border-radius:42px;padding:34px 44px;gap:26px;
+            margin-top:20px;margin-bottom:0;border-radius:34px;padding:26px 36px;gap:20px;
             background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42));
             backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
             box-shadow:0 14px 40px rgba(70,130,150,.1);border:none;
           }
-          .fb-whisper-icon{width:72px;height:72px;border-radius:50%;background:#bfe0e8;flex-shrink:0}
-          .fb-whisper-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2px;color:#8aa6ad}
-          .fb-whisper-desc{font-size:clamp(24px, 1.88vw, 36px);color:#3c4f57;font-weight:300;margin-top:8px}
-          .fb-open-btn{background:linear-gradient(135deg,#5fa0ac,#7bbac4);font-size:clamp(18px, 1.35vw, 26px);padding:17px 40px;box-shadow:0 8px 20px rgba(95,160,172,.35)}
+          .fb-whisper-icon{width:58px;height:58px;border-radius:50%;background:#bfe0e8;flex-shrink:0}
+          .fb-whisper-label{font-size:clamp(14px, 1.04vw, 20px);letter-spacing:2px;color:#8aa6ad}
+          .fb-whisper-desc{font-size:clamp(19px, 1.56vw, 30px);color:#3c4f57;font-weight:300;margin-top:6px}
+          .fb-open-btn{background:linear-gradient(135deg,#5fa0ac,#7bbac4);font-size:clamp(14px, 1.04vw, 20px);padding:13px 30px;box-shadow:0 8px 20px rgba(95,160,172,.35)}
 
           /* Wind-down card */
           .fb-winddown-card{
-            margin-top:28px;margin-bottom:0;border-radius:42px;padding:44px 50px;gap:36px;
+            margin-top:20px;margin-bottom:0;border-radius:34px;padding:36px 40px;gap:28px;
             background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.42));
             backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
             box-shadow:0 14px 40px rgba(70,130,150,.1);border:none;
             flex-direction:row;align-items:center;
           }
-          .fb-winddown-label{font-size:clamp(18px, 1.35vw, 26px);letter-spacing:2px;color:#8aa6ad}
-          .fb-winddown-title{font-size:clamp(32px, 2.5vw, 48px)}
-          .fb-winddown-sub{font-size:clamp(19px, 1.51vw, 29px)}
-          .fb-play-btn{background:#2f3e45;color:#eef4f5;font-size:clamp(18px, 1.35vw, 26px);padding:16px 36px;border-radius:32px}
-          .fb-browse-link{font-size:clamp(18px, 1.35vw, 26px)}
-          .fb-blob{width:180px;height:180px;background:radial-gradient(circle at 38% 34%,#cfeaf0,#a6d2dc);box-shadow:0 14px 34px rgba(120,180,195,.32);margin-left:auto;flex-shrink:0}
+          .fb-winddown-label{font-size:clamp(14px, 1.04vw, 20px);letter-spacing:2px;color:#8aa6ad}
+          .fb-winddown-title{font-size:clamp(26px, 2.08vw, 40px)}
+          .fb-winddown-sub{font-size:clamp(15px, 1.25vw, 24px)}
+          .fb-play-btn{background:#2f3e45;color:#eef4f5;font-size:clamp(14px, 1.04vw, 20px);padding:12px 28px;border-radius:26px}
+          .fb-browse-link{font-size:clamp(14px, 1.04vw, 20px)}
+          .fb-blob{width:144px;height:144px;background:radial-gradient(circle at 38% 34%,#cfeaf0,#a6d2dc);box-shadow:0 14px 34px rgba(120,180,195,.32);margin-left:auto;flex-shrink:0}
 
           /* Footer */
-          .fb-footer{padding:54px 0 66px;font-size:clamp(18px, 1.35vw, 26px);color:#7c9098}
+          .fb-footer{padding:40px 0 50px;font-size:clamp(14px, 1.04vw, 20px);color:#7c9098}
         }
       `}</style>
 
-      <div className="fb-root">
+      <div
+        className="fb-root"
+        style={{
+          transformOrigin: "top left",
+          transform: `scale(${pageScale})`,
+          width: pageScale < 1 ? `${(100 / pageScale).toFixed(3)}vw` : undefined,
+        }}
+      >
 
         {/* ── NAVBAR ─────────────────────────────────────────────────────────── */}
         <nav className="fb-navbar">
@@ -525,7 +552,10 @@ export default function Dashboard() {
           <div className={`fb-sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
 
           {/* ── SIDEBAR ────────────────────────────────────────────────────── */}
-          <aside className={`fb-sidebar ${sidebarOpen ? "open" : ""}`}>
+          <aside
+            className={`fb-sidebar ${sidebarOpen ? "open" : ""}`}
+            style={isDesktop ? { transform: `scale(${pageScale})`, transformOrigin: "top left" } : {}}
+          >
             <div className="fb-sidebar-top">
               <div className="fb-sidebar-close">
                 <button className="fb-sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
@@ -570,9 +600,15 @@ export default function Dashboard() {
                   last 7 days
                 </div>
                 <div className="fb-mood-dots">
-                  {["empty","overwhelmed","okayish","empty","heavy","full","overwhelmed"].map((m, i) => (
-                    <div key={i} className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS[m] }} />
-                  ))}
+                  {moodHistory.length > 0 ? (
+                    moodHistory.map((m, i) => (
+                      <div key={i} className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS[m] }} />
+                    ))
+                  ) : (
+                    <span style={{ fontSize:14, color:"#7c9098", fontStyle:"italic" }}>
+                      {user ? "no check-ins yet this week" : "log in to track moods"}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="fb-sidebar-section">
@@ -800,11 +836,18 @@ export default function Dashboard() {
           background: st.bg,
           color: st.fg,
           display:"flex", alignItems:"center", justifyContent:"center",
-          padding: "48px 24px",
           textAlign:"center",
           fontFamily:"var(--font-dm-sans),sans-serif",
           transition:"background 0.7s ease",
         }}>
+          {/* scale wrapper — background stays full-screen, content scales */}
+          <div style={{
+            width: "100%", height: "100%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transform: `scale(${pageScale})`,
+            transformOrigin: "center center",
+            padding: "48px 24px",
+          }}>
 
           {/* floating particles (full s2 only) */}
           {st.showParticles && (
@@ -918,6 +961,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          </div>{/* end scale wrapper */}
         </div>
       )}
     </>

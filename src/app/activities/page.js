@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ACTIVITIES } from "./data"
 
@@ -137,6 +137,17 @@ function ActivityCard({ activity, router }) {
 
 export default function ActivitiesPage() {
   const router = useRouter()
+  const [pageScale, setPageScale] = useState(1)
+
+  useEffect(() => {
+    const check = () => {
+      const w = window.innerWidth
+      setPageScale(w >= 1024 ? Math.min(1, w / 1920) : 1)
+    }
+    check()
+    window.addEventListener("resize", check)
+    return () => window.removeEventListener("resize", check)
+  }, [])
 
   return (
     <>
@@ -225,7 +236,14 @@ export default function ActivitiesPage() {
         }
       `}</style>
 
-      <div className="act-root">
+      <div
+        className="act-root"
+        style={pageScale < 1 ? {
+          transformOrigin: "top left",
+          transform: `scale(${pageScale})`,
+          width: `${(100 / pageScale).toFixed(3)}vw`,
+        } : {}}
+      >
 
         {/* nav */}
         <nav className="act-nav">
