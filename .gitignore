@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Word/Office temp lock files
+~$*.docx
+~$*.doc
+~$*.xlsx
+
+# env secrets (just making sure!)
+.env.local
+.env
