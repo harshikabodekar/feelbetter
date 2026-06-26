@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { MOOD_ACTIVITIES, ACTIVITY_MAP } from "@/app/activities/data"
-import { saveMood, fetchLast7Days } from "@/lib/supabase"
+import { saveMood, fetchLast7Days, fetchJournalEntries, fetchVoiceNotes, getSignedUrl } from "@/lib/supabase"
 
 /* ── Mood overlay data (state 1 → state 2) ──────────────────── */
 const MOOD_SCREENS = {
@@ -169,6 +169,549 @@ const MOOD_COLORS = {
   okayish: "#7a8a6f", heavy: "#6b5fa3", full: "#e08a3c",
 }
 
+// ── Entries panel helpers ─────────────────────────────────────────────────────
+
+// "Jun 23, 9:34pm" — date + time in one readable string
+function fmtDate(iso) {
+  const d    = new Date(iso)
+  const date = d.toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+  const h    = d.getHours(), m = d.getMinutes()
+  const ampm = h >= 12 ? "pm" : "am"
+  const h12  = h % 12 || 12
+  return `${date}, ${h12}:${m < 10 ? "0" + m : m}${ampm}`
+}
+
+// Clickable activity card for the Level 1 "home" view — mirrors the activities page style
+function EntriesActivityCard({ label, desc, accent, glow, icon, onClick }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? "rgba(255,255,255,.82)" : "rgba(255,255,255,.62)",
+        backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+        border: ".5px solid rgba(255,255,255,.9)",
+        borderRadius: 26, padding: "28px 22px 22px",
+        cursor: "pointer",
+        display: "flex", flexDirection: "column", alignItems: "flex-start",
+        transform: hovered ? "translateY(-5px)" : "none",
+        boxShadow: hovered
+          ? `0 18px 48px ${glow}, 0 6px 16px rgba(0,0,0,.06)`
+          : "0 4px 18px rgba(60,120,140,.07)",
+        transition: "transform .25s ease, box-shadow .25s ease, background .2s",
+        minHeight: 190,
+      }}
+    >
+      {/* Icon circle */}
+      <div style={{
+        width: 52, height: 52, borderRadius: "50%",
+        background: hovered ? accent + "44" : accent + "28",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        marginBottom: 18, color: accent,
+        transition: "background .25s",
+      }}>
+        {icon}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 500, color: "#1a3a42", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 300, color: "#5a8080", lineHeight: 1.55, flex: 1 }}>
+        {desc}
+      </div>
+      <div style={{
+        marginTop: 18, display: "flex", alignItems: "center", gap: 6,
+        fontSize: 13, color: accent, fontWeight: 400,
+      }}>
+        view entries
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+// Small circular refresh button used at the top of each Level 2 view
+function PanelRefreshButton({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title="refresh"
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        background: "rgba(255,255,255,.5)", backdropFilter: "blur(8px)",
+        border: ".5px solid rgba(255,255,255,.85)", borderRadius: 20,
+        padding: "9px 18px", cursor: "pointer", fontSize: 13,
+        color: "#6a9aaa", fontFamily: "var(--font-dm-sans), sans-serif",
+        flexShrink: 0, transition: "background .2s",
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.82)"}
+      onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 4v6h6M23 20v-6h-6"/>
+        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
+      </svg>
+      refresh
+    </button>
+  )
+}
+
+// Loading placeholders while entries fetch
+function EntryShimmer() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+      {[1, 2, 3].map(i => (
+        <div key={i} style={{
+          background: "rgba(255,255,255,.42)", borderRadius: 18, height: 90,
+          animation: "epShimmer 1.8s ease-in-out infinite",
+          animationDelay: `${i * 0.15}s`,
+        }} />
+      ))}
+    </div>
+  )
+}
+
+// Empty state card with a heading and optional sub-line
+function PanelEmptyState({ text, sub }) {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,.5)",
+      backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+      border: ".5px solid rgba(255,255,255,.9)",
+      borderRadius: 22, padding: "36px 28px", textAlign: "center",
+    }}>
+      <p style={{
+        fontFamily: "var(--font-dm-serif), serif",
+        fontSize: 20, fontStyle: "italic", color: "#6a9aaa",
+        lineHeight: 1.6, margin: 0,
+      }}>{text}</p>
+      {sub && (
+        <p style={{ marginTop: 8, fontSize: 14, color: "#8aaab2", fontWeight: 300 }}>{sub}</p>
+      )}
+    </div>
+  )
+}
+
+// Section label with an inline SVG icon — used in Pages Level 2 view
+function PanelSectionLabel({ icon, color, text }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 16 }}>
+      {icon === "book" && (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+          stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" opacity=".85">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+      )}
+      {icon === "mic" && (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+          stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" opacity=".85">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8"  y1="23" x2="16" y2="23"/>
+        </svg>
+      )}
+      <span style={{
+        fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase",
+        color: "#8a9090", fontWeight: 600,
+      }}>{text}</span>
+    </div>
+  )
+}
+
+// A single journal entry card — mood dot + date + content preview
+function EntryCard({ entry }) {
+  const preview = (entry.content || "").slice(0, 240)
+    + ((entry.content || "").length > 240 ? "…" : "")
+  return (
+    <div style={{
+      background: "rgba(255,255,255,.58)",
+      backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+      border: ".5px solid rgba(255,255,255,.9)",
+      borderRadius: 18, padding: "18px 22px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 11, flexWrap: "wrap", gap: 8 }}>
+        {entry.mood && (
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+            background: MOOD_COLORS[entry.mood] || "#ccc",
+            display: "inline-block",
+          }} title={entry.mood} />
+        )}
+        <span style={{ marginLeft: "auto", fontSize: 12, color: "#9aacb0", whiteSpace: "nowrap" }}>
+          {fmtDate(entry.created_at)}
+        </span>
+      </div>
+      <p style={{ fontSize: 15, fontWeight: 300, color: "#2a3838", lineHeight: 1.8, margin: 0 }}>
+        {preview}
+      </p>
+    </div>
+  )
+}
+
+// Voice note card — generates signed URL lazily; shows audio player on success
+function VoiceNoteCard({ note }) {
+  const [url,        setUrl]        = useState(null)
+  const [urlLoading, setUrlLoading] = useState(true)
+
+  useEffect(() => {
+    getSignedUrl(note.file_path)
+      .then(signed => {
+        if (!signed) console.warn('[feelbetter] VoiceNoteCard: null URL for', note.file_path)
+        setUrl(signed)
+      })
+      .catch(err => console.error('[feelbetter] VoiceNoteCard getSignedUrl:', err))
+      .finally(() => setUrlLoading(false))
+  }, [note.file_path])
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,.58)",
+      backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+      border: ".5px solid rgba(255,255,255,.9)",
+      borderRadius: 18, padding: "18px 22px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        {note.mood && (
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+            background: MOOD_COLORS[note.mood] || "#ccc",
+            display: "inline-block",
+          }} title={note.mood} />
+        )}
+        <span style={{ marginLeft: "auto", fontSize: 12, color: "#9aacb0", whiteSpace: "nowrap" }}>
+          {fmtDate(note.created_at)}
+        </span>
+      </div>
+      {urlLoading
+        ? <p style={{ fontSize: 13, color: "#9aacb0", fontStyle: "italic" }}>loading audio...</p>
+        : url
+          ? <audio src={url} controls style={{ width: "100%", borderRadius: 8, outline: "none" }} />
+          : <p style={{ fontSize: 13, color: "#9a8090", fontStyle: "italic" }}>couldn&apos;t load this recording</p>
+      }
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Full-screen "your entries" panel — 2-level navigation:
+//   Level 1 ("home")  — activity cards: Spill, Pages
+//   Level 2 ("spill") — all spill journal_entries
+//   Level 2 ("pages") — pages-write journal_entries + voice_notes
+// Renders outside the scaled fb-root so position:fixed covers the true viewport.
+// ─────────────────────────────────────────────────────────────────────────────
+function EntriesPanel({ userId, onClose, pageScale }) {
+  // Drives the two-level nav
+  const [panelView, setPanelView] = useState("home")
+
+  // ── Spill ──
+  const [spillLoading, setSpillLoading] = useState(false)
+  const [spillEntries, setSpillEntries] = useState([])
+  const [spillKey,     setSpillKey]     = useState(0)   // increment → force re-fetch
+
+  // ── Pages ──
+  const [pagesLoading, setPagesLoading] = useState(false)
+  const [pagesWriting, setPagesWriting] = useState([])
+  const [pagesVoices,  setPagesVoices]  = useState([])
+  const [pagesKey,     setPagesKey]     = useState(0)
+
+  // Load spill entries when entering the spill drill-in
+  useEffect(() => {
+    if (panelView !== "spill" || !userId) return
+    setSpillLoading(true)
+    fetchJournalEntries(userId, { activity: "spill" })
+      .catch(err => { console.error('[feelbetter] entries spill:', err); return [] })
+      .then(data => setSpillEntries(data || []))
+      .finally(() => setSpillLoading(false))
+  }, [panelView, userId, spillKey])
+
+  // Load pages entries when entering the pages drill-in
+  useEffect(() => {
+    if (panelView !== "pages" || !userId) return
+    setPagesLoading(true)
+    Promise.all([
+      fetchJournalEntries(userId, { activity: "pages-write" })
+        .catch(err => { console.error('[feelbetter] entries pages-write:', err); return [] }),
+      fetchVoiceNotes(userId)
+        .catch(err => { console.error('[feelbetter] entries voices:', err); return [] }),
+    ])
+      .then(([writings, voices]) => {
+        setPagesWriting(writings || [])
+        setPagesVoices(voices || [])
+      })
+      .finally(() => setPagesLoading(false))
+  }, [panelView, userId, pagesKey])
+
+  const goHome = () => setPanelView("home")
+
+  // Shared nav bar — back button context-aware
+  const NavBar = () => (
+    <nav style={{ display: "flex", alignItems: "center", gap: 16, padding: "28px 40px 0" }}>
+      <button
+        onClick={panelView === "home" ? onClose : goHome}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 40, height: 40, borderRadius: "50%",
+          background: "rgba(255,255,255,.6)", backdropFilter: "blur(8px)",
+          border: ".5px solid rgba(255,255,255,.8)",
+          cursor: "pointer", flexShrink: 0, transition: "background .2s",
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.88)"}
+        onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.6)"}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+          stroke="#2a5a66" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5M12 5l-7 7 7 7" />
+        </svg>
+      </button>
+      <span style={{
+        fontFamily: "var(--font-dm-serif), serif",
+        fontSize: 18, color: "#1a3a42",
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+          stroke="#3a8a8f" strokeWidth="1.8" strokeLinecap="round">
+          <path d="M2 9c2.4-3 4.3-3 6.7 0s4.3 3 6.7 0 4.3-3 6.6 0" />
+          <path d="M2 14.5c2.4-3 4.3-3 6.7 0s4.3 3 6.7 0 4.3-3 6.6 0" />
+        </svg>
+        feelbetter
+      </span>
+    </nav>
+  )
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 350,
+      background: "linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%)",
+      overflowY: "auto",
+      fontFamily: "var(--font-dm-sans), sans-serif",
+      color: "#1a3a42",
+    }}>
+      {/* Shimmer keyframe — scoped to this panel */}
+      <style>{`@keyframes epShimmer{0%,100%{opacity:1}50%{opacity:.38}}`}</style>
+
+      {/* Desktop scale wrapper — top-left origin, same as the rest of the app */}
+      <div style={pageScale < 1 ? {
+        transformOrigin: "top left",
+        transform: `scale(${pageScale})`,
+        width: `${(100 / pageScale).toFixed(3)}vw`,
+      } : {}}>
+
+        {/* ══════════════════════════════════════════════════════════════
+            LEVEL 1 — HOME: Spill + Pages activity cards
+        ══════════════════════════════════════════════════════════════ */}
+        {panelView === "home" && (
+          <>
+            <NavBar />
+            <main style={{ maxWidth: 720, margin: "0 auto", padding: "52px 28px 100px" }}>
+
+              {/* Page heading */}
+              <div style={{ marginBottom: 48 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                    stroke="#3a8a8f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity=".55">
+                    <path d="M4 5c3-1 6-1 8 0 2-1 5-1 8 0v14c-3-1-6-1-8 0-2-1-5-1-8 0V5z"/>
+                    <path d="M12 5v14"/>
+                  </svg>
+                </div>
+                <h1 style={{
+                  fontFamily: "var(--font-dm-serif), serif",
+                  fontSize: "clamp(44px,5.5vw,68px)",
+                  fontWeight: 400, color: "#0f2e35",
+                  letterSpacing: -1.5, lineHeight: 1.02, marginBottom: 12,
+                }}>your entries.</h1>
+                <p style={{ fontSize: 17, color: "#5a7a80", fontWeight: 300, lineHeight: 1.65 }}>
+                  everything you&apos;ve saved, just for you.
+                </p>
+              </div>
+
+              {/* Guest message */}
+              {!userId && (
+                <PanelEmptyState
+                  text="sign in to see your entries."
+                  sub="your saves will live here once you&apos;re logged in."
+                />
+              )}
+
+              {/* Activity cards grid */}
+              {userId && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+                  <EntriesActivityCard
+                    label="spill"
+                    desc="your unfiltered thoughts and feelings"
+                    accent="#a8c5cc"
+                    glow="rgba(122,171,180,.3)"
+                    onClick={() => setPanelView("spill")}
+                    icon={
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2s-7 7.5-7 12a7 7 0 0 0 14 0c0-4.5-7-12-7-12z"/>
+                        <path d="M9 17a3 3 0 0 0 6 0"/>
+                      </svg>
+                    }
+                  />
+                  <EntriesActivityCard
+                    label="pages"
+                    desc="written notes and voice recordings"
+                    accent="#dcc9a8"
+                    glow="rgba(196,168,122,.3)"
+                    onClick={() => setPanelView("pages")}
+                    icon={
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                      </svg>
+                    }
+                  />
+                </div>
+              )}
+            </main>
+          </>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+            LEVEL 2a — SPILL entries
+        ══════════════════════════════════════════════════════════════ */}
+        {panelView === "spill" && (
+          <>
+            <NavBar />
+            <main style={{ maxWidth: 720, margin: "0 auto", padding: "52px 28px 100px" }}>
+
+              {/* Breadcrumb */}
+              <p style={{
+                fontSize: 12, letterSpacing: 1.6, textTransform: "uppercase",
+                color: "#7a9aaa", marginBottom: 36, fontWeight: 500,
+              }}>
+                your entries → spill
+              </p>
+
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 40, flexWrap: "wrap" }}>
+                <div>
+                  <h2 style={{
+                    fontFamily: "var(--font-dm-serif), serif",
+                    fontSize: "clamp(38px,4.6vw,58px)",
+                    fontWeight: 400, color: "#0f2e35",
+                    letterSpacing: -1.2, lineHeight: 1.04, marginBottom: 8,
+                  }}>spill.</h2>
+                  <p style={{ fontSize: 16, color: "#5a8a80", fontWeight: 300 }}>
+                    every thought you let out.
+                  </p>
+                </div>
+                {!spillLoading && (
+                  <PanelRefreshButton onClick={() => setSpillKey(k => k + 1)} />
+                )}
+              </div>
+
+              {spillLoading && <EntryShimmer />}
+
+              {!spillLoading && spillEntries.length === 0 && (
+                <PanelEmptyState
+                  text="no spills yet."
+                  sub="when you spill something, it&apos;ll appear here."
+                />
+              )}
+
+              {!spillLoading && spillEntries.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+                  {spillEntries.map(entry => (
+                    <EntryCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              )}
+            </main>
+          </>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+            LEVEL 2b — PAGES entries: Write sub-section + Voice sub-section
+        ══════════════════════════════════════════════════════════════ */}
+        {panelView === "pages" && (
+          <>
+            <NavBar />
+            <main style={{ maxWidth: 720, margin: "0 auto", padding: "52px 28px 100px" }}>
+
+              {/* Breadcrumb */}
+              <p style={{
+                fontSize: 12, letterSpacing: 1.6, textTransform: "uppercase",
+                color: "#9a8a70", marginBottom: 36, fontWeight: 500,
+              }}>
+                your entries → pages
+              </p>
+
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 40, flexWrap: "wrap" }}>
+                <div>
+                  <h2 style={{
+                    fontFamily: "var(--font-dm-serif), serif",
+                    fontSize: "clamp(38px,4.6vw,58px)",
+                    fontWeight: 400, color: "#0f2e35",
+                    letterSpacing: -1.2, lineHeight: 1.04, marginBottom: 8,
+                  }}>pages.</h2>
+                  <p style={{ fontSize: 16, color: "#7a6a50", fontWeight: 300 }}>
+                    written words and voice notes.
+                  </p>
+                </div>
+                {!pagesLoading && (
+                  <PanelRefreshButton onClick={() => setPagesKey(k => k + 1)} />
+                )}
+              </div>
+
+              {pagesLoading && <EntryShimmer />}
+
+              {!pagesLoading && (
+                <>
+                  {/* ── Write notes sub-section ── */}
+                  <section style={{ marginBottom: 44 }}>
+                    <PanelSectionLabel icon="book" color="#c4a870" text="write notes" />
+                    {pagesWriting.length === 0 ? (
+                      <PanelEmptyState
+                        text="no written pages yet."
+                        sub="your write-mode entries will appear here."
+                      />
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {pagesWriting.map(entry => (
+                          <EntryCard key={entry.id} entry={entry} />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  {/* ── Voice notes sub-section ── */}
+                  <section>
+                    <PanelSectionLabel icon="mic" color="#b89aac" text="voice notes" />
+                    {pagesVoices.length === 0 ? (
+                      <PanelEmptyState
+                        text="no voice notes yet."
+                        sub="your voice recordings will appear here."
+                      />
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {pagesVoices.map(note => (
+                          <VoiceNoteCard key={note.id} note={note} />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
+            </main>
+          </>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
 const BREATHE_STEPS = [
   { text: "breathe in... 4",  ms: 4000 },
   { text: "hold... 7",        ms: 7000 },
@@ -208,6 +751,7 @@ export default function Dashboard() {
   const [clusterScale,  setClusterScale]  = useState(1)
   const [moodHistory,   setMoodHistory]   = useState([])   // real data from Supabase
   const [pageScale,     setPageScale]     = useState(1)
+  const [historyOpen,   setHistoryOpen]   = useState(false)
   const clusterWrapRef = useRef(null)
 
   useEffect(() => {
@@ -619,11 +1163,16 @@ export default function Dashboard() {
                   </svg>
                   history
                 </div>
-                <div className="fb-history-item">
+                <div
+                  className="fb-history-item"
+                  onClick={() => setHistoryOpen(true)}
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+                >
                   <span>your entries</span>
-                  <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
                   </svg>
                 </div>
               </div>
@@ -825,6 +1374,18 @@ export default function Dashboard() {
 
         <div className="fb-footer">whatever you&#39;re feeling, it&#39;s welcome here.</div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          ENTRIES HISTORY PANEL — full-screen, outside the scaled fb-root so
+          position:fixed covers the true viewport, not the transformed one
+          ══════════════════════════════════════════════════════════════════════ */}
+      {historyOpen && (
+        <EntriesPanel
+          userId={user?.id}
+          onClose={() => setHistoryOpen(false)}
+          pageScale={pageScale}
+        />
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           FULL-SCREEN MOOD OVERLAY — renders on top of everything, never inside
