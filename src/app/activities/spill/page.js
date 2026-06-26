@@ -139,7 +139,8 @@ function SpillContent() {
   const [aiMode,  setAiMode]  = useState(null)  // "validate" | "honest" | "guide" | "sit"
 
   // ── AI write state ──
-  const [text,      setText]      = useState("")
+  // searchParams.get("prefill") is set when coming from Compass "take to spill"
+  const [text,      setText]      = useState(searchParams.get("prefill") || "")
   const [response,  setResponse]  = useState(null)
   const [loading,   setLoading]   = useState(false)
 

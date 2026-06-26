@@ -401,9 +401,10 @@ function VoiceNoteCard({ note }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Full-screen "your entries" panel — 2-level navigation:
-//   Level 1 ("home")  — activity cards: Spill, Pages
-//   Level 2 ("spill") — all spill journal_entries
-//   Level 2 ("pages") — pages-write journal_entries + voice_notes
+//   Level 1 ("home")    — activity cards: Spill, Pages, Compass
+//   Level 2 ("spill")   — all spill journal_entries
+//   Level 2 ("pages")   — pages-write journal_entries + voice_notes
+//   Level 2 ("compass") — compass journal_entries (reflection summaries)
 // Renders outside the scaled fb-root so position:fixed covers the true viewport.
 // ─────────────────────────────────────────────────────────────────────────────
 function EntriesPanel({ userId, onClose, pageScale }) {
@@ -420,6 +421,11 @@ function EntriesPanel({ userId, onClose, pageScale }) {
   const [pagesWriting, setPagesWriting] = useState([])
   const [pagesVoices,  setPagesVoices]  = useState([])
   const [pagesKey,     setPagesKey]     = useState(0)
+
+  // ── Compass ──
+  const [compassLoading, setCompassLoading] = useState(false)
+  const [compassEntries, setCompassEntries] = useState([])
+  const [compassKey,     setCompassKey]     = useState(0)
 
   // Load spill entries when entering the spill drill-in
   useEffect(() => {
@@ -447,6 +453,16 @@ function EntriesPanel({ userId, onClose, pageScale }) {
       })
       .finally(() => setPagesLoading(false))
   }, [panelView, userId, pagesKey])
+
+  // Load compass entries when entering the compass drill-in
+  useEffect(() => {
+    if (panelView !== "compass" || !userId) return
+    setCompassLoading(true)
+    fetchJournalEntries(userId, { activity: "compass" })
+      .catch(err => { console.error('[feelbetter] entries compass:', err); return [] })
+      .then(data => setCompassEntries(data || []))
+      .finally(() => setCompassLoading(false))
+  }, [panelView, userId, compassKey])
 
   const goHome = () => setPanelView("home")
 
@@ -539,9 +555,9 @@ function EntriesPanel({ userId, onClose, pageScale }) {
                 />
               )}
 
-              {/* Activity cards grid */}
+              {/* Activity cards grid — 3 columns for Spill, Pages, Compass */}
               {userId && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                   <EntriesActivityCard
                     label="spill"
                     desc="your unfiltered thoughts and feelings"
@@ -549,7 +565,7 @@ function EntriesPanel({ userId, onClose, pageScale }) {
                     glow="rgba(122,171,180,.3)"
                     onClick={() => setPanelView("spill")}
                     icon={
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 2s-7 7.5-7 12a7 7 0 0 0 14 0c0-4.5-7-12-7-12z"/>
                         <path d="M9 17a3 3 0 0 0 6 0"/>
@@ -563,10 +579,25 @@ function EntriesPanel({ userId, onClose, pageScale }) {
                     glow="rgba(196,168,122,.3)"
                     onClick={() => setPanelView("pages")}
                     icon={
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
                         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                      </svg>
+                    }
+                  />
+                  <EntriesActivityCard
+                    label="compass"
+                    desc="your traced reflections"
+                    accent="#b0bba0"
+                    glow="rgba(138,152,120,.3)"
+                    onClick={() => setPanelView("compass")}
+                    icon={
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polygon points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88"
+                          fill="currentColor" opacity=".4" stroke="none"/>
                       </svg>
                     }
                   />
@@ -622,6 +653,60 @@ function EntriesPanel({ userId, onClose, pageScale }) {
               {!spillLoading && spillEntries.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
                   {spillEntries.map(entry => (
+                    <EntryCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              )}
+            </main>
+          </>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════
+            LEVEL 2c — COMPASS entries: reflection summaries
+        ══════════════════════════════════════════════════════════════ */}
+        {panelView === "compass" && (
+          <>
+            <NavBar />
+            <main style={{ maxWidth: 720, margin: "0 auto", padding: "52px 28px 100px" }}>
+
+              {/* Breadcrumb */}
+              <p style={{
+                fontSize: 12, letterSpacing: 1.6, textTransform: "uppercase",
+                color: "#8a9a88", marginBottom: 36, fontWeight: 500,
+              }}>
+                your entries → compass
+              </p>
+
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 40, flexWrap: "wrap" }}>
+                <div>
+                  <h2 style={{
+                    fontFamily: "var(--font-dm-serif), serif",
+                    fontSize: "clamp(38px,4.6vw,58px)",
+                    fontWeight: 400, color: "#0f2e35",
+                    letterSpacing: -1.2, lineHeight: 1.04, marginBottom: 8,
+                  }}>compass.</h2>
+                  <p style={{ fontSize: 16, color: "#6a7a60", fontWeight: 300 }}>
+                    every feeling you traced.
+                  </p>
+                </div>
+                {!compassLoading && (
+                  <PanelRefreshButton onClick={() => setCompassKey(k => k + 1)} />
+                )}
+              </div>
+
+              {compassLoading && <EntryShimmer />}
+
+              {!compassLoading && compassEntries.length === 0 && (
+                <PanelEmptyState
+                  text="no compass reflections yet."
+                  sub="when you trace a feeling, it'll appear here."
+                />
+              )}
+
+              {!compassLoading && compassEntries.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+                  {compassEntries.map(entry => (
                     <EntryCard key={entry.id} entry={entry} />
                   ))}
                 </div>
