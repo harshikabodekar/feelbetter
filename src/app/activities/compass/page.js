@@ -380,6 +380,22 @@ function CompassContent() {
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* Door grid — two columns on wide screens, single column on mobile */
+        .compass-door-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 18px;
+        }
+        @media (max-width: 639px) {
+          .compass-door-grid {
+            grid-template-columns: 1fr;
+          }
+          /* Tighten card padding slightly so it breathes better full-width */
+          .compass-door-card {
+            padding: 28px 22px;
+          }
+        }
+
         /* Door card hover state */
         .compass-door-card {
           background: rgba(255,255,255,.58);
@@ -456,8 +472,8 @@ function CompassContent() {
                 </p>
               </div>
 
-              {/* Door cards — two paths side by side */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+              {/* Door cards — side by side on desktop, stacked on mobile (see .compass-door-grid) */}
+              <div className="compass-door-grid">
 
                 {/* Door 1: body-first */}
                 <div className="compass-door-card" onClick={() => chooseDoor(1)}>

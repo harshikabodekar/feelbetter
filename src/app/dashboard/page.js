@@ -970,6 +970,24 @@ export default function Dashboard() {
         .fb-sidebar-bottom{padding:20px 22px;border-top:1px solid rgba(0,0,0,.08);flex-shrink:0}
         .fb-logout{font-size:14px;color:#4a8a96;cursor:pointer;display:flex;align-items:center;gap:8px}
 
+        /* ── SIDEBAR compact — phone only ──────────────────────────────────────── */
+        @media(max-width:767px){
+          .fb-sidebar-top{padding:16px 18px}
+          .fb-profile-avatar{width:42px;height:42px;font-size:16px}
+          .fb-profile-name{font-size:15px}
+          .fb-profile-action{font-size:12px}
+          .fb-anon-toggle{padding:8px 0;margin-bottom:10px}
+          .fb-anon-label{font-size:13px}
+          .fb-sidebar-middle{padding:0 16px}
+          .fb-sidebar-section{margin-bottom:14px}
+          .fb-sidebar-section-label{font-size:11px;margin-bottom:8px}
+          .fb-sidebar-section-label svg{width:15px;height:15px}
+          .fb-history-item{font-size:13px;padding:8px 12px}
+          .fb-sidebar-bottom{padding:14px 16px}
+          .fb-logout{font-size:13px}
+          .fb-mood-dot{width:17px;height:17px}
+        }
+
         /* ── NAVBAR ────────────────────────────────────────────────────────────── */
         .fb-navbar{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;flex-shrink:0}
         @media(min-width:768px){.fb-navbar{padding:24px 48px}}
@@ -1270,7 +1288,7 @@ export default function Dashboard() {
                 </div>
                 <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                   {["ocean waves","rain","forest","silence"].map((s, i) => (
-                    <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:"22px", padding:"9px 20px", borderRadius:24, cursor:"pointer" }}>{s}</span>
+                    <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:isDesktop?"22px":"13px", padding:isDesktop?"9px 20px":"6px 12px", borderRadius:24, cursor:"pointer" }}>{s}</span>
                   ))}
                 </div>
               </div>
@@ -1283,7 +1301,7 @@ export default function Dashboard() {
                 </div>
                 <div
                   onClick={() => router.push("/activities")}
-                  style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 20px", background:"rgba(255,255,255,.5)", borderRadius:12, cursor:"pointer", fontSize:22, color:"#1a3a42", transition:"background .2s" }}
+                  style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:isDesktop?"16px 20px":"10px 14px", background:"rgba(255,255,255,.5)", borderRadius:12, cursor:"pointer", fontSize:isDesktop?22:13, color:"#1a3a42", transition:"background .2s" }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
                   onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
                 >
@@ -1300,7 +1318,7 @@ export default function Dashboard() {
                   settings
                 </div>
               </div>
-              <div style={{ background:"rgba(255,255,255,.55)", borderRadius:18, padding:"22px 24px", fontSize:26, lineHeight:1.4, color:"#46606a", display:"flex", alignItems:"flex-start", gap:12, marginBottom:24 }}>
+              <div style={{ background:"rgba(255,255,255,.55)", borderRadius:18, padding:isDesktop?"22px 24px":"14px 16px", fontSize:isDesktop?26:14, lineHeight:1.4, color:"#46606a", display:"flex", alignItems:"flex-start", gap:12, marginBottom:isDesktop?24:16 }}>
                 🌸 you&#39;ve checked in 4 days this week.
               </div>
             </div>
@@ -1486,13 +1504,33 @@ export default function Dashboard() {
           fontFamily:"var(--font-dm-sans),sans-serif",
           transition:"background 0.7s ease",
         }}>
-          {/* scale wrapper — background stays full-screen, content scales */}
+
+          {/* ── Close button — OUTSIDE the scroll wrapper so it always stays
+              on top and is never scrolled away or blocked by content.
+              position:absolute is relative to this outer position:fixed div.
+              zIndex:10 ensures it renders above the scale wrapper below. */}
+          <div
+            onClick={closeOverlay}
+            style={{ position:"absolute", top:30, right:36, zIndex:10, cursor:"pointer", opacity:.55, display:"flex" }}
+          >
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M5 5l14 14M19 5L5 19"/>
+            </svg>
+          </div>
+
+          {/* scale wrapper — background stays full-screen, content scales.
+              On mobile (not desktop): overflow-y:auto lets content scroll when it
+              exceeds the viewport height. alignItems:flex-start starts content at
+              the top so the scroll top is always reachable. */}
           <div style={{
             width: "100%", height: "100%",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            display: "flex",
+            alignItems: isDesktop ? "center" : "flex-start",
+            justifyContent: "center",
             transform: `scale(${pageScale})`,
             transformOrigin: "center center",
-            padding: "48px 24px",
+            padding: isDesktop ? "48px 24px" : "0",
+            overflowY: isDesktop ? "visible" : "auto",
           }}>
 
           {/* floating particles (full s2 only) */}
@@ -1516,63 +1554,57 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* close button */}
-          <div
-            onClick={closeOverlay}
-            style={{ position:"absolute", top:30, right:36, cursor:"pointer", opacity:.55, display:"flex" }}
-          >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M5 5l14 14M19 5L5 19"/>
-            </svg>
-          </div>
-
-          <div className="fb-overlay-content" style={{ position:"relative", maxWidth:860, display:"flex", flexDirection:"column", alignItems:"center", padding:"0 32px" }}>
-            <div style={{ color:st.accent, marginBottom:40, display:"flex", justifyContent:"center" }}>
+          <div className="fb-overlay-content" style={{ position:"relative", maxWidth:860, display:"flex", flexDirection:"column", alignItems:"center", padding:isDesktop?"0 32px":"64px 20px 52px" }}>
+            <div style={{ color:st.accent, marginBottom:isDesktop?40:22, display:"flex", justifyContent:"center" }}>
               <OverlayIcon icon={overlayDef.icon} color={st.accent} />
             </div>
 
-            <div style={{ fontSize:"clamp(44px, 6vw, 72px)", fontWeight:300, lineHeight:1.1, letterSpacing:"-.8px" }}>
+            {/* Headline — desktop: large clamp. Mobile: smaller clamp so it wraps
+                without overflowing the 375px viewport. */}
+            <div style={{ fontSize:isDesktop?"clamp(44px, 6vw, 72px)":"clamp(22px, 6.5vw, 38px)", fontWeight:300, lineHeight:1.15, letterSpacing:"-.5px" }}>
               {st.head}
             </div>
 
-            <div style={{ marginTop:28, fontSize:"clamp(19px, 2.4vw, 26px)", fontWeight:300, opacity:.85, lineHeight:1.65 }}>
+            <div style={{ marginTop:isDesktop?28:16, fontSize:isDesktop?"clamp(19px, 2.4vw, 26px)":"clamp(15px, 4vw, 19px)", fontWeight:300, opacity:.85, lineHeight:1.65 }}>
               {st.sub}
             </div>
 
-            <div style={{ marginTop:56, display:"flex", flexDirection:"column", alignItems:"center", gap:18 }}>
+            {/* Buttons — desktop: generous padding/font. Mobile: compact. */}
+            <div style={{ marginTop:isDesktop?56:32, display:"flex", flexDirection:"column", alignItems:"center", gap:isDesktop?18:12 }}>
               {isS1 && overlayDef.s1.showSit && (
-                <div onClick={closeOverlay} style={{ background:"rgba(255,255,255,.35)", color:st.fg, padding:"16px 40px", borderRadius:34, cursor:"pointer", fontSize:22 }}>
+                <div onClick={closeOverlay} style={{ background:"rgba(255,255,255,.35)", color:st.fg, padding:isDesktop?"16px 40px":"11px 28px", borderRadius:34, cursor:"pointer", fontSize:isDesktop?22:17 }}>
                   just sit here
                 </div>
               )}
               <div
                 onClick={isS1 ? () => setOverlayState(2) : closeOverlay}
                 style={{
-                  display:"flex", alignItems:"center", gap:12,
+                  display:"flex", alignItems:"center", gap:isDesktop?12:8,
                   background: isS1 ? st.accent : "rgba(255,255,255,.32)",
                   color: isS1 ? "#fff" : st.fg,
-                  padding:"18px 48px", borderRadius:40, cursor:"pointer",
-                  fontSize:24, fontWeight:500,
+                  padding:isDesktop?"18px 48px":"13px 30px", borderRadius:40, cursor:"pointer",
+                  fontSize:isDesktop?24:18, fontWeight:500,
                   boxShadow:"0 14px 36px rgba(0,0,0,.15)",
                 }}
               >
                 {isS1 ? "whenever you're ready" : "carry this with me"}
-                {isS1 && <span style={{ fontSize:22 }}>🌸</span>}
+                {isS1 && <span style={{ fontSize:isDesktop?22:17 }}>🌸</span>}
               </div>
               {isS1 && (
-                <div style={{ fontStyle:"italic", fontSize:20, opacity:.6, marginTop:4 }}>
+                <div style={{ fontStyle:"italic", fontSize:isDesktop?20:14, opacity:.6, marginTop:4 }}>
                   no rush. this stays as long as you need.
                 </div>
               )}
             </div>
 
-            {/* state 2 only: suggested activities for this mood */}
+            {/* state 2 only: suggested activities for this mood.
+                Mobile: tighter spacing, smaller text so pills fit on screen. */}
             {!isS1 && MOOD_ACTIVITIES[moodOverlay] && (
-              <div style={{ marginTop:52, borderTop:"1px solid rgba(255,255,255,.25)", paddingTop:40, display:"flex", flexDirection:"column", alignItems:"center", gap:18 }}>
-                <div style={{ fontSize:18, fontWeight:300, opacity:.7, letterSpacing:.3 }}>
+              <div style={{ marginTop:isDesktop?52:28, borderTop:"1px solid rgba(255,255,255,.25)", paddingTop:isDesktop?40:22, display:"flex", flexDirection:"column", alignItems:"center", gap:isDesktop?18:12 }}>
+                <div style={{ fontSize:isDesktop?18:13, fontWeight:300, opacity:.7, letterSpacing:.3 }}>
                   want to do something with this?
                 </div>
-                <div style={{ display:"flex", gap:14, flexWrap:"wrap", justifyContent:"center" }}>
+                <div style={{ display:"flex", gap:isDesktop?14:8, flexWrap:"wrap", justifyContent:"center" }}>
                   {MOOD_ACTIVITIES[moodOverlay].map(id => {
                     const act = ACTIVITY_MAP[id]
                     return (
@@ -1580,27 +1612,27 @@ export default function Dashboard() {
                         key={id}
                         onClick={() => { closeOverlay(); router.push(`${act.route}?mood=${moodOverlay}`) }}
                         style={{
-                          display:"flex", alignItems:"center", gap:10,
+                          display:"flex", alignItems:"center", gap:isDesktop?10:6,
                           background:"rgba(255,255,255,.22)",
                           border:"1px solid rgba(255,255,255,.35)",
                           color: st.fg,
-                          padding:"13px 28px", borderRadius:32, cursor:"pointer",
-                          fontSize:18, fontWeight:400,
+                          padding:isDesktop?"13px 28px":"9px 16px", borderRadius:32, cursor:"pointer",
+                          fontSize:isDesktop?18:14, fontWeight:400,
                           backdropFilter:"blur(8px)",
                           transition:"background .2s",
                         }}
                         onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.36)"}
                         onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.22)"}
                       >
-                        <span style={{ fontSize:14, opacity:.7, textTransform:"uppercase", letterSpacing:1 }}>{act.name}</span>
-                        <span style={{ fontSize:14, opacity:.6 }}>· {act.desc}</span>
+                        <span style={{ fontSize:isDesktop?14:11, opacity:.7, textTransform:"uppercase", letterSpacing:1 }}>{act.name}</span>
+                        <span style={{ fontSize:isDesktop?14:11, opacity:.6 }}>· {act.desc}</span>
                       </div>
                     )
                   })}
                 </div>
                 <div
                   onClick={() => { closeOverlay(); router.push("/activities") }}
-                  style={{ fontSize:16, opacity:.6, cursor:"pointer", textDecoration:"underline", marginTop:4 }}
+                  style={{ fontSize:isDesktop?16:13, opacity:.6, cursor:"pointer", textDecoration:"underline", marginTop:4 }}
                 >
                   see all 5 →
                 </div>

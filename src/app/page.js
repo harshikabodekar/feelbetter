@@ -93,14 +93,54 @@ export default function Home() {
       position: "relative",
     }}>
 
-      {/* logo */}
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "14px",
-        zIndex: 2,
-      }}>
+      {/* ── Mobile typography overrides ─────────────────────────────────────────
+          All desktop sizes live in the inline style props below (untouched).
+          This single media query scales down the two oversized values for phones.
+
+          Why it's needed:
+            "feelbetter" at 6rem with letterSpacing 0.12em is ~580px wide.
+            The subtitle at 3rem with letterSpacing 0.22em is ~1000px wide.
+            Both overflow the 375px viewport and get silently clipped by the
+            parent's overflow: hidden. Reducing font-size AND letter-spacing
+            is necessary — letter-spacing alone accounts for ~100–300px of
+            the overflow at large sizes.
+
+          !important is required because inline style= always beats a class rule
+          in CSS specificity. We're only using it here in a scoped media query,
+          not as a general habit. */}
+      <style>{`
+        @media (max-width: 639px) {
+          /* Add horizontal padding so text never touches the screen edges.
+             width + box-sizing ensure it doesn't push wider than the viewport. */
+          .splash-content {
+            padding: 0 24px;
+            width: 100%;
+            box-sizing: border-box;
+          }
+          /* 6rem → 3rem: "feelbetter" at 3rem + 0.06em tracking is ~265px — fits at 375px. */
+          .splash-h1 {
+            font-size: 3rem !important;
+            letter-spacing: 0.06em !important;
+          }
+          /* 3rem + 0.22em → 1.1rem + 0.08em: subtitle goes from ~1000px to ~305px. */
+          .splash-sub {
+            font-size: 1.1rem !important;
+            letter-spacing: 0.08em !important;
+          }
+        }
+      `}</style>
+
+      {/* logo — className hooks let the media query above override the inline sizes */}
+      <div
+        className="splash-content"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "14px",
+          zIndex: 2,
+        }}
+      >
         {/* logo mark
         <div style={{
           width: "75px",
@@ -115,30 +155,36 @@ export default function Home() {
         }}>
         </div> */}
 
-        {/* app name */}
-        <h1 style={{
-          color: "#e8f8f9",
-          fontSize: "6rem",
-          fontWeight: "700",
-          margin: "0",
-          letterSpacing: "0.12em",
-          textShadow: "0 2px 20px rgba(14,143,163,0.5)",
-        }}>
+        {/* app name — desktop: 6rem / 0.12em. Mobile: see .splash-h1 above. */}
+        <h1
+          className="splash-h1"
+          style={{
+            color: "#e8f8f9",
+            fontSize: "6rem",
+            fontWeight: "700",
+            margin: "0",
+            letterSpacing: "0.12em",
+            textShadow: "0 2px 20px rgba(14,143,163,0.5)",
+          }}
+        >
           feelbetter
         </h1>
 
-        {/* tagline */}
-        <p style={{
-          color: "rgba(232,248,249,0.85)",
-          fontSize: "3rem",
-          letterSpacing: "0.22em",
-          margin: "0",
-          fontWeight: "600",
-        }}>
+        {/* tagline — desktop: 3rem / 0.22em. Mobile: see .splash-sub above. */}
+        <p
+          className="splash-sub"
+          style={{
+            color: "rgba(232,248,249,0.85)",
+            fontSize: "3rem",
+            letterSpacing: "0.22em",
+            margin: "0",
+            fontWeight: "600",
+          }}
+        >
           a safe space for your feelings
         </p>
 
-        {/* go button */}
+        {/* go button — 1rem with padding 12px/36px is already small enough for mobile */}
         <button
           onClick={() => router.push("/login")}
           style={{
