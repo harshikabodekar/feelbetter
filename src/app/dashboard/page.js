@@ -54,6 +54,16 @@ const MOOD_SCREENS = {
   },
 }
 
+/* ── Reveal copy for the detect-mood "this feels like…" step ── */
+// One warm line per mood shown in the reveal screen between detection and the experience.
+const MOOD_REVEAL = {
+  empty:       { label: "empty.",       line: "that quiet is real. you don't have to fill it." },
+  overwhelmed: { label: "overwhelmed.", line: "so much at once. one breath is enough right now." },
+  okayish:     { label: "okay-ish.",    line: "somewhere in between is still somewhere. that counts." },
+  heavy:       { label: "heavy.",       line: "you've been carrying something. that's allowed to hurt." },
+  full:        { label: "full.",        line: "hold onto this. you're allowed to feel this bright." },
+}
+
 /* ── Overlay mood icons ─────────────────────────────────────── */
 function OverlayIcon({ icon, color }) {
   if (icon === "empty") return (
@@ -837,6 +847,11 @@ export default function Dashboard() {
   const [moodHistory,   setMoodHistory]   = useState([])   // real data from Supabase
   const [pageScale,     setPageScale]     = useState(1)
   const [historyOpen,   setHistoryOpen]   = useState(false)
+  const [detectOpen,    setDetectOpen]    = useState(false)  // detect-mood overlay visible
+  const [detectText,    setDetectText]    = useState("")     // what the user typed
+  const [detectLoading, setDetectLoading] = useState(false)  // API call in flight
+  const [detectError,   setDetectError]   = useState(null)   // soft error message
+  const [detectReveal,  setDetectReveal]  = useState(null)   // detected mood shown in reveal step
   const clusterWrapRef = useRef(null)
 
   useEffect(() => {
@@ -890,6 +905,41 @@ export default function Dashboard() {
   }
   function closeOverlay() { setMoodOverlay(null); setOverlayState(1) }
 
+  // Sends text to /api/detect-mood, then shows the reveal step (not the experience yet).
+  // The user reads the detected mood and chooses to "take me there" before the experience opens.
+  async function handleDetect() {
+    if (!detectText.trim()) return
+    setDetectLoading(true)
+    setDetectError(null)
+    try {
+      const res  = await fetch("/api/detect-mood", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ text: detectText }),
+      })
+      const data = await res.json()
+      if (data.mood) {
+        // Show the reveal step — user sees the mood named before entering the experience
+        setDetectReveal(data.mood)
+      } else {
+        setDetectError("i couldn't quite name it — want to pick how you feel instead?")
+      }
+    } catch {
+      setDetectError("i couldn't quite name it — want to pick how you feel instead?")
+    } finally {
+      setDetectLoading(false)
+    }
+  }
+
+  // Called from the reveal step — closes the detect overlay and opens the mood experience
+  function enterMoodFromReveal() {
+    const mood = detectReveal
+    setDetectOpen(false)
+    setDetectText("")
+    setDetectReveal(null)
+    openMood(mood)
+  }
+
   function startBreathe() {
     if (breatheActive) return
     setBreatheActive(true)
@@ -927,6 +977,7 @@ export default function Dashboard() {
         @keyframes fbFloat{0%{transform:translateY(12px);opacity:0}25%{opacity:.85}100%{transform:translateY(-70px);opacity:0}}
         @keyframes fbRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
         @keyframes fishBob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-14px) rotate(4deg)}}
+        @keyframes listenPulse{0%,100%{opacity:.5;transform:scale(.98)}50%{opacity:1;transform:scale(1)}}
         .fb-overlay-content{animation:fbRise .5s ease both}
 
         /* ── SIDEBAR base ──────────────────────────────────────────────────────── */
@@ -1379,6 +1430,57 @@ export default function Dashboard() {
                       <div style={{ marginTop:14, fontSize:20, fontWeight:400 }}>{blob.label}</div>
                     </div>
                   ))}
+
+                  {/* "not sure?" — sits in the top-right corner of the blob cluster.
+                      Positioned at left:748 to give ~46px breathing room from the
+                      "overwhelmed" blob's right edge (702). Height kept to 248 so
+                      there's ~30px gap above the "full" blob (top:302).
+                      Soft aqua tint + dashed border reads as "helper, not a mood". */}
+                  <div
+                    onClick={() => { setDetectOpen(true); setDetectError(null) }}
+                    style={{
+                      position: "absolute", left: 748, top: 22,
+                      width: 158, height: 248,
+                      borderRadius: "48% 52% 54% 46%/50% 46% 54% 50%",
+                      background: "linear-gradient(160deg,rgba(255,255,255,.58),rgba(214,238,244,.46))",
+                      backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+                      border: "1.5px dashed rgba(74,138,150,.3)",
+                      boxShadow: "0 8px 28px rgba(90,150,160,.07)",
+                      display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center",
+                      gap: 10, cursor: "pointer",
+                      textAlign: "center", padding: "18px 14px",
+                      transition: "background .3s, transform .35s, box-shadow .35s",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "linear-gradient(160deg,rgba(255,255,255,.78),rgba(214,238,244,.62))"
+                      e.currentTarget.style.transform = "scale(1.04)"
+                      e.currentTarget.style.boxShadow = "0 14px 38px rgba(90,150,160,.14)"
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "linear-gradient(160deg,rgba(255,255,255,.58),rgba(214,238,244,.46))"
+                      e.currentTarget.style.transform = "scale(1)"
+                      e.currentTarget.style.boxShadow = "0 8px 28px rgba(90,150,160,.07)"
+                    }}
+                  >
+                    <div style={{
+                      width: 48, height: 48, borderRadius: "50%",
+                      background: "rgba(74,138,150,.13)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                        stroke="#4a8a96" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        <path d="M11 8v.01M11 11v3"/>
+                      </svg>
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 400, color: "#3a7a88", lineHeight: 1.3 }}>
+                      not sure?
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 300, color: "#6a9aa8", lineHeight: 1.5 }}>
+                      let me help<br/>you name it
+                    </div>
+                  </div>
                 </div>
                 </div>
               ) : (
@@ -1401,6 +1503,43 @@ export default function Dashboard() {
                       <span className="fb-mood-label" style={{ color:"#fff" }}>{mood.label}</span>
                     </button>
                   ))}
+
+                  {/* "not sure?" — opens the detect-mood overlay */}
+                  <button
+                    onClick={() => { setDetectOpen(true); setDetectError(null) }}
+                    style={{
+                      width: "100%",
+                      border: "1.5px dashed rgba(74,138,150,.35)",
+                      background: "rgba(255,255,255,.42)",
+                      borderRadius: 22, cursor: "pointer",
+                      padding: "15px 18px",
+                      display: "flex", alignItems: "center", gap: 14,
+                      transition: "background .2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.68)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.42)"}
+                  >
+                    <div style={{
+                      width: 44, height: 44, borderRadius: "50%",
+                      background: "rgba(74,138,150,.14)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="#4a8a96" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        <path d="M11 8v.01M11 11v3"/>
+                      </svg>
+                    </div>
+                    <div style={{ textAlign: "left" }}>
+                      <div style={{ fontSize: 14, color: "#3a7a88", fontWeight: 500, marginBottom: 2 }}>
+                        not sure what you feel?
+                      </div>
+                      <div style={{ fontSize: 12, color: "#7aaab2", fontWeight: 300 }}>
+                        tell me — i&apos;ll help name it
+                      </div>
+                    </div>
+                  </button>
                 </div>
               )}
             </div>
@@ -1488,6 +1627,270 @@ export default function Dashboard() {
           onClose={() => setHistoryOpen(false)}
           pageScale={pageScale}
         />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          DETECT MOOD OVERLAY — full-screen aqua, renders outside scaled fb-root.
+          Two-step flow:
+            Step 1 (input)  — user writes freely → hits "find my feeling"
+            Step 2 (reveal) — we show the named mood warmly → "take me there"
+            Then the mood experience opens.
+          z-index 320: above dashboard/sidebar (100-200), below entries panel (350).
+          ══════════════════════════════════════════════════════════════════════ */}
+      {detectOpen && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 320,
+          background: "linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "var(--font-dm-sans), sans-serif",
+          color: "#1a3a42",
+          padding: "24px",
+        }}>
+
+          {/* Close (✕) — clears all detect state and dismisses the overlay */}
+          <button
+            onClick={() => { setDetectOpen(false); setDetectText(""); setDetectError(null); setDetectReveal(null) }}
+            style={{
+              position: "absolute", top: 24, right: 24,
+              width: 44, height: 44, borderRadius: "50%",
+              background: "rgba(255,255,255,.72)",
+              backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+              border: ".5px solid rgba(255,255,255,.88)",
+              boxShadow: "0 2px 14px rgba(60,120,140,.14)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", transition: "background .2s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.72)"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="#2a5a66" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+
+          {/* ── STEP 2: REVEAL ─────────────────────────────────────────────────
+              Shown after detection — names the mood warmly before entering
+              the full experience. This is the emotional payoff of the feature.
+              ────────────────────────────────────────────────────────────────── */}
+          {detectReveal && MOOD_REVEAL[detectReveal] && (
+            <div className="fb-overlay-content" style={{
+              display: "flex", flexDirection: "column",
+              alignItems: "center", textAlign: "center",
+              maxWidth: 520,
+            }}>
+              {/* Small label */}
+              <p style={{
+                fontSize: 11, letterSpacing: 2.2, textTransform: "uppercase",
+                color: "#7aabb5", fontWeight: 600, marginBottom: 32,
+              }}>
+                your feeling, named.
+              </p>
+
+              {/* "this feels like..." — italic serif lead-in */}
+              <p style={{
+                fontFamily: "var(--font-dm-serif), serif",
+                fontSize: isDesktop ? 24 : 18,
+                color: "#6a8a90", fontWeight: 400,
+                fontStyle: "italic", marginBottom: 10, lineHeight: 1.2,
+              }}>
+                this feels like...
+              </p>
+
+              {/* The detected mood word — the emotional centrepiece */}
+              <h1 style={{
+                fontFamily: "var(--font-dm-serif), serif",
+                fontSize: isDesktop ? 80 : 56,
+                fontWeight: 400, letterSpacing: -2,
+                color: MOOD_SCREENS[detectReveal]?.s1?.accent || "#4a8a96",
+                lineHeight: 1, marginBottom: 28,
+              }}>
+                {MOOD_REVEAL[detectReveal].label}
+              </h1>
+
+              {/* Warm one-liner specific to this mood */}
+              <p style={{
+                fontSize: isDesktop ? 18 : 15,
+                color: "#5a7a80", fontWeight: 300,
+                lineHeight: 1.75, marginBottom: 48,
+                maxWidth: 380,
+              }}>
+                {MOOD_REVEAL[detectReveal].line}
+              </p>
+
+              {/* Primary CTA — enters the mood experience */}
+              <button
+                onClick={enterMoodFromReveal}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  background: MOOD_SCREENS[detectReveal]?.s1?.accent || "#4a8a96",
+                  color: "#fff", border: "none",
+                  borderRadius: 40, padding: isDesktop ? "18px 48px" : "15px 36px",
+                  fontSize: isDesktop ? 20 : 17, fontWeight: 400,
+                  fontFamily: "var(--font-dm-sans), sans-serif",
+                  cursor: "pointer",
+                  boxShadow: "0 14px 36px rgba(0,0,0,.14)",
+                  transition: "opacity .2s",
+                  marginBottom: 20,
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = ".85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              >
+                take me there
+                <span style={{ fontSize: isDesktop ? 18 : 15 }}>🌸</span>
+              </button>
+
+              {/* Secondary link — lets the user go back and re-type if wrong */}
+              <button
+                onClick={() => setDetectReveal(null)}
+                style={{
+                  background: "none", border: "none",
+                  fontSize: isDesktop ? 14 : 13, color: "#7aaab4",
+                  fontStyle: "italic", cursor: "pointer",
+                  fontFamily: "var(--font-dm-sans), sans-serif",
+                  textDecoration: "underline", padding: 0,
+                  transition: "color .2s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = "#4a8a96"}
+                onMouseLeave={e => e.currentTarget.style.color = "#7aaab4"}
+              >
+                that doesn&apos;t feel right — try again
+              </button>
+            </div>
+          )}
+
+          {/* ── STEP 1: INPUT ──────────────────────────────────────────────────
+              The writing form — shown while no reveal is active.
+              ────────────────────────────────────────────────────────────────── */}
+          {!detectReveal && (
+            <div style={{
+              background: "rgba(255,255,255,.68)",
+              backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+              border: ".5px solid rgba(255,255,255,.92)",
+              borderRadius: 36,
+              padding: isDesktop ? "52px 56px" : "36px 28px",
+              maxWidth: 600, width: "100%",
+              boxShadow: "0 24px 64px rgba(60,120,140,.13)",
+            }}>
+
+              {/* Gentle search icon */}
+              <div style={{ marginBottom: 20, display: "flex", justifyContent: "center" }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: "50%",
+                  background: "rgba(74,138,150,.12)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                    stroke="#4a8a96" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    <path d="M11 8v.01M11 11v3"/>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Heading */}
+              <h2 style={{
+                fontFamily: "var(--font-dm-serif), serif",
+                fontSize: isDesktop ? 30 : 22,
+                fontWeight: 400, color: "#0f2e35",
+                lineHeight: 1.3, marginBottom: 8,
+                textAlign: "center",
+              }}>
+                tell me what&apos;s on your mind.
+              </h2>
+              <p style={{
+                fontSize: isDesktop ? 16 : 14,
+                color: "#5a8a96", fontWeight: 300,
+                textAlign: "center", marginBottom: 28,
+                lineHeight: 1.6, fontStyle: "italic",
+              }}>
+                i&apos;ll help you name what you&apos;re feeling.
+              </p>
+
+              {/* Textarea */}
+              <textarea
+                value={detectText}
+                onChange={e => setDetectText(e.target.value)}
+                placeholder="write whatever's there — messy, half-formed, anything…"
+                rows={5}
+                style={{
+                  width: "100%",
+                  background: "rgba(255,255,255,.55)",
+                  border: ".5px solid rgba(255,255,255,.9)",
+                  borderRadius: 20, padding: "18px 20px",
+                  fontSize: isDesktop ? 16 : 15,
+                  color: "#1a3a42",
+                  fontFamily: "var(--font-dm-sans), sans-serif",
+                  fontWeight: 300, lineHeight: 1.7,
+                  resize: "none", outline: "none",
+                  transition: "border .2s",
+                  boxShadow: "inset 0 2px 8px rgba(60,120,140,.05)",
+                }}
+                onFocus={e => e.target.style.border = ".5px solid rgba(74,138,150,.45)"}
+                onBlur={e  => e.target.style.border = ".5px solid rgba(255,255,255,.9)"}
+              />
+
+              {/* Error state */}
+              {detectError && (
+                <div style={{
+                  marginTop: 16, padding: "16px 18px",
+                  background: "rgba(255,255,255,.5)",
+                  border: ".5px solid rgba(255,255,255,.85)",
+                  borderRadius: 18, textAlign: "center",
+                }}>
+                  <p style={{
+                    fontSize: 14, color: "#5a8a96",
+                    fontStyle: "italic", marginBottom: 14, lineHeight: 1.6,
+                  }}>
+                    {detectError}
+                  </p>
+                  <button
+                    onClick={() => { setDetectOpen(false); setDetectError(null) }}
+                    style={{
+                      background: "rgba(74,138,150,.15)", border: "none",
+                      borderRadius: 20, padding: "9px 22px",
+                      fontSize: 13, color: "#3a7a88", cursor: "pointer",
+                      fontFamily: "var(--font-dm-sans), sans-serif",
+                      transition: "background .2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(74,138,150,.28)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(74,138,150,.15)"}
+                  >
+                    choose for myself
+                  </button>
+                </div>
+              )}
+
+              {/* Submit / loading — hidden while error is shown */}
+              {!detectError && (
+                <button
+                  onClick={handleDetect}
+                  disabled={detectLoading || !detectText.trim()}
+                  style={{
+                    marginTop: 20, width: "100%",
+                    padding: isDesktop ? "18px" : "15px",
+                    background: detectLoading
+                      ? "rgba(74,138,150,.35)"
+                      : detectText.trim()
+                        ? "linear-gradient(135deg,#5fa0ac,#7bbac4)"
+                        : "rgba(74,138,150,.18)",
+                    border: "none", borderRadius: 28,
+                    color: detectText.trim() ? "#fff" : "#8aaab2",
+                    fontSize: isDesktop ? 18 : 16,
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                    fontWeight: 400,
+                    cursor: detectText.trim() && !detectLoading ? "pointer" : "default",
+                    transition: "background .25s",
+                    animation: detectLoading ? "listenPulse 1.6s ease-in-out infinite" : "none",
+                  }}
+                >
+                  {detectLoading ? "...listening" : "find my feeling"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
