@@ -1736,8 +1736,211 @@ export default function Dashboard() {
 
           /* Footer */
           .fb-footer{padding:40px 0 50px;font-size:clamp(14px, 1.04vw, 20px);color:#7c9098}
+
+          /* ── Sidebar desktop — scale everything up to fill the full drawer height ── */
+          .fb-sidebar-top{padding:36px 28px 26px}
+          .fb-profile{margin-bottom:22px;gap:16px}
+          .fb-profile-avatar{width:72px;height:72px;font-size:26px}
+          .fb-profile-name{font-size:22px}
+          .fb-profile-action{font-size:15px;margin-top:6px}
+          .fb-anon-toggle{padding:16px 0;margin-bottom:18px}
+          .fb-anon-label{font-size:16px}
+          .fb-toggle{width:50px;height:30px;border-radius:15px}
+          .fb-toggle-thumb{width:24px;height:24px}
+          .fb-toggle.on .fb-toggle-thumb{left:23px}
+          .fb-sidebar-middle{padding:28px 26px 36px}
+          .fb-sidebar-section{margin-bottom:30px}
+          .fb-sidebar-section-label{font-size:13px;letter-spacing:1.6px;margin-bottom:13px}
+          .fb-sidebar-section-label svg{width:19px;height:19px}
+          .fb-mood-dots{gap:11px}
+          .fb-mood-dot{width:30px;height:30px}
+          .fb-history-item{font-size:16px;padding:15px 18px;border-radius:14px}
+          .fb-lock-icon{width:18px;height:18px}
+          .fb-sidebar-bottom{padding:28px 28px}
+          .fb-logout{font-size:16px;gap:10px}
+          .fb-logout svg{width:20px;height:20px}
         }
       `}</style>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SIDEBAR + OVERLAY — rendered outside fb-root so position:fixed anchors
+          to the true viewport. fb-root has transform:scale(pageScale); any
+          position:fixed child inside a transformed ancestor is contained by that
+          ancestor (CSS spec), which caused double-scaling: once from fb-root's
+          transform and once from the sidebar's own transform. Moving them here
+          means only the sidebar's own transform applies and the height formula
+          (100/pageScale)vh × pageScale = 100vh works correctly.
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className={`fb-sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+      <aside
+        className={`fb-sidebar ${sidebarOpen ? "open" : ""}`}
+        style={isDesktop ? {
+          transform: `scale(${pageScale})`,
+          transformOrigin: "top left",
+          height: `${(100 / pageScale).toFixed(2)}vh`,
+        } : {}}
+      >
+        <div className="fb-sidebar-top">
+          <div className="fb-sidebar-close">
+            <button className="fb-sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
+          </div>
+          <div className="fb-profile">
+            <div className="fb-profile-avatar" style={anonymousMode ? { background:"linear-gradient(135deg,#6b7fa8,#4a5a80)" } : {}}>
+              {anonymousMode
+                ? <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+                    <circle cx="16" cy="8" r="3.5" fill="rgba(255,255,255,.95)"/>
+                    <circle cx="16" cy="8" r="5.5" fill="rgba(255,255,255,.18)"/>
+                    <path d="M13.5 10.5 Q9 13 5 17" stroke="rgba(255,255,255,.75)" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M13 11.5 Q8.5 14.5 4.5 18.5" stroke="rgba(255,255,255,.45)" strokeWidth="1.4" strokeLinecap="round"/>
+                    <path d="M14 11 Q9.5 13.5 6 17" stroke="rgba(255,255,255,.25)" strokeWidth="1" strokeLinecap="round"/>
+                  </svg>
+                : isGuest ? "👤" : initials}
+            </div>
+            <div className="fb-profile-info">
+              <div className="fb-profile-name">{anonymousMode ? "soul" : isGuest ? "guest" : firstName}</div>
+              <div
+                className="fb-profile-action"
+                onClick={() => !anonymousMode && !isGuest && router.push("/settings")}
+              >
+                {anonymousMode ? "hidden from view" : isGuest ? "not saved" : "tap for settings"}
+              </div>
+            </div>
+          </div>
+          {!isGuest && (
+            <div className="fb-anon-toggle">
+              <div className="fb-anon-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <label className="fb-anon-label">anonymous mode</label>
+              <button className={`fb-toggle ${anonymousMode ? "on" : ""}`} onClick={() => setAnonymousMode(a => !a)}>
+                <div className="fb-toggle-thumb" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="fb-sidebar-middle">
+          <div className="fb-sidebar-section">
+            <div className="fb-sidebar-section-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+                <path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>
+              </svg>
+              last 7 days
+            </div>
+            <div className="fb-mood-dots">
+              {Array.from({ length: 7 }).map((_, i) => {
+                const mood = moodHistory[i]
+                return (
+                  <div
+                    key={i}
+                    className="fb-mood-dot"
+                    style={{
+                      backgroundColor: mood ? MOOD_COLORS[mood] : "rgba(90,150,160,.16)",
+                      animation: moodHistoryLoading
+                        ? `fbDotPulse 1.5s ease-in-out ${i * 0.08}s infinite`
+                        : "none",
+                    }}
+                  />
+                )
+              })}
+            </div>
+          </div>
+          <div className="fb-sidebar-section">
+            <div className="fb-sidebar-section-label">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 5c3-1 6-1 8 0 2-1 5-1 8 0v14c-3-1-6-1-8 0-2-1-5-1-8 0V5z"/>
+                <path d="M12 5v14"/>
+              </svg>
+              history
+            </div>
+            <div
+              className="fb-history-item"
+              onClick={() => setHistoryOpen(true)}
+              style={{ cursor: "pointer" }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+            >
+              <span>your entries</span>
+              <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </div>
+          <div className="fb-sidebar-section">
+            <div className="fb-sidebar-section-label">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>
+              </svg>
+              ambient sound
+            </div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+              {["ocean waves","rain","forest","silence"].map((s, i) => (
+                <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:13, padding:"6px 12px", borderRadius:20, cursor:"pointer", border:".5px solid rgba(255,255,255,.7)", transition:"background .18s" }}>{s}</span>
+              ))}
+            </div>
+          </div>
+          <div className="fb-sidebar-section">
+            <div className="fb-sidebar-section-label">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+              </svg>
+              activities
+            </div>
+            <div
+              className="fb-history-item"
+              onClick={() => router.push("/activities")}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.82)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+            >
+              <span>explore activities</span>
+              <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </div>
+          <div className="fb-sidebar-section">
+            <div className="fb-sidebar-section-label">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <path d="M4 8h8M16 8h4M4 16h4M12 16h8"/>
+                <circle cx="14" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/>
+              </svg>
+              settings
+            </div>
+            {!isGuest && (
+              <div
+                className="fb-history-item"
+                onClick={() => router.push("/settings")}
+                style={{ cursor: "pointer" }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+              >
+                <span>preferences & account</span>
+                <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </div>
+            )}
+          </div>
+          {!isGuest && (
+            <div style={{ background:"rgba(255,255,255,.55)", borderRadius:14, padding:"13px 15px", fontSize:13, lineHeight:1.5, color:"#46606a", display:"flex", alignItems:"flex-start", gap:10, marginBottom:16, border:".5px solid rgba(255,255,255,.72)" }}>
+              🌸 you&#39;ve checked in 4 days this week.
+            </div>
+          )}
+        </div>
+
+        <div className="fb-sidebar-bottom">
+          <div className="fb-logout" onClick={handleLogout}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 5h5v14h-5"/><path d="M3 12h11M11 8l4 4-4 4"/>
+            </svg>
+            {isGuest ? "sign in" : "logout"}
+          </div>
+        </div>
+      </aside>
 
       <div
         className="fb-root"
@@ -1768,183 +1971,6 @@ export default function Dashboard() {
         </nav>
 
         <div className="fb-wrapper">
-
-          {/* overlay */}
-          <div className={`fb-sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
-
-          {/* ── SIDEBAR ────────────────────────────────────────────────────── */}
-          <aside
-            className={`fb-sidebar ${sidebarOpen ? "open" : ""}`}
-            style={isDesktop ? {
-              transform: `scale(${pageScale})`,
-              transformOrigin: "top left",
-              // After scaling, 100vh becomes pageScale*100vh visually.
-              // Dividing by pageScale makes the visual height always equal 100vh.
-              height: `${(100 / pageScale).toFixed(2)}vh`,
-            } : {}}
-          >
-            <div className="fb-sidebar-top">
-              <div className="fb-sidebar-close">
-                <button className="fb-sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
-              </div>
-              <div className="fb-profile">
-                <div className="fb-profile-avatar" style={anonymousMode ? { background:"linear-gradient(135deg,#6b7fa8,#4a5a80)" } : {}}>
-                  {anonymousMode
-                    ? <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
-                        <circle cx="16" cy="8" r="3.5" fill="rgba(255,255,255,.95)"/>
-                        <circle cx="16" cy="8" r="5.5" fill="rgba(255,255,255,.18)"/>
-                        <path d="M13.5 10.5 Q9 13 5 17" stroke="rgba(255,255,255,.75)" strokeWidth="2" strokeLinecap="round"/>
-                        <path d="M13 11.5 Q8.5 14.5 4.5 18.5" stroke="rgba(255,255,255,.45)" strokeWidth="1.4" strokeLinecap="round"/>
-                        <path d="M14 11 Q9.5 13.5 6 17" stroke="rgba(255,255,255,.25)" strokeWidth="1" strokeLinecap="round"/>
-                      </svg>
-                    : isGuest ? "👤" : initials}
-                </div>
-                <div className="fb-profile-info">
-                  <div className="fb-profile-name">{anonymousMode ? "soul" : isGuest ? "guest" : firstName}</div>
-                  <div
-                    className="fb-profile-action"
-                    onClick={() => !anonymousMode && !isGuest && router.push("/settings")}
-                  >
-                    {anonymousMode ? "hidden from view" : isGuest ? "not saved" : "tap for settings"}
-                  </div>
-                </div>
-              </div>
-              {/* Anonymous mode toggle — hidden for guests (they're already anonymous) */}
-              {!isGuest && (
-                <div className="fb-anon-toggle">
-                  <div className="fb-anon-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
-                    </svg>
-                  </div>
-                  <label className="fb-anon-label">anonymous mode</label>
-                  <button className={`fb-toggle ${anonymousMode ? "on" : ""}`} onClick={() => setAnonymousMode(a => !a)}>
-                    <div className="fb-toggle-thumb" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="fb-sidebar-middle">
-              <div className="fb-sidebar-section">
-                <div className="fb-sidebar-section-label">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-                    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>
-                  </svg>
-                  last 7 days
-                </div>
-                <div className="fb-mood-dots">
-                  {/* Always render 7 slots — filled when data exists, faded placeholder otherwise */}
-                  {Array.from({ length: 7 }).map((_, i) => {
-                    const mood = moodHistory[i]
-                    return (
-                      <div
-                        key={i}
-                        className="fb-mood-dot"
-                        style={{
-                          backgroundColor: mood ? MOOD_COLORS[mood] : "rgba(90,150,160,.16)",
-                          animation: moodHistoryLoading
-                            ? `fbDotPulse 1.5s ease-in-out ${i * 0.08}s infinite`
-                            : "none",
-                        }}
-                      />
-                    )
-                  })}
-                </div>
-              </div>
-              <div className="fb-sidebar-section">
-                <div className="fb-sidebar-section-label">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 5c3-1 6-1 8 0 2-1 5-1 8 0v14c-3-1-6-1-8 0-2-1-5-1-8 0V5z"/>
-                    <path d="M12 5v14"/>
-                  </svg>
-                  history
-                </div>
-                <div
-                  className="fb-history-item"
-                  onClick={() => setHistoryOpen(true)}
-                  style={{ cursor: "pointer" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
-                >
-                  <span>your entries</span>
-                  <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                  </svg>
-                </div>
-              </div>
-              <div className="fb-sidebar-section">
-                <div className="fb-sidebar-section-label">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>
-                  </svg>
-                  ambient sound
-                </div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                  {["ocean waves","rain","forest","silence"].map((s, i) => (
-                    <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:13, padding:"6px 12px", borderRadius:20, cursor:"pointer", border:".5px solid rgba(255,255,255,.7)", transition:"background .18s" }}>{s}</span>
-                  ))}
-                </div>
-              </div>
-              <div className="fb-sidebar-section">
-                <div className="fb-sidebar-section-label">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
-                  </svg>
-                  activities
-                </div>
-                <div
-                  className="fb-history-item"
-                  onClick={() => router.push("/activities")}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.82)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
-                >
-                  <span>explore activities</span>
-                  <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                  </svg>
-                </div>
-              </div>
-              <div className="fb-sidebar-section">
-                <div className="fb-sidebar-section-label">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-                    <path d="M4 8h8M16 8h4M4 16h4M12 16h8"/>
-                    <circle cx="14" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/>
-                  </svg>
-                  settings
-                </div>
-                {!isGuest && (
-                  <div
-                    className="fb-history-item"
-                    onClick={() => router.push("/settings")}
-                    style={{ cursor: "pointer" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
-                  >
-                    <span>preferences & account</span>
-                    <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                  </div>
-                )}
-              </div>
-              {!isGuest && (
-                <div style={{ background:"rgba(255,255,255,.55)", borderRadius:14, padding:"13px 15px", fontSize:13, lineHeight:1.5, color:"#46606a", display:"flex", alignItems:"flex-start", gap:10, marginBottom:16, border:".5px solid rgba(255,255,255,.72)" }}>
-                  🌸 you&#39;ve checked in 4 days this week.
-                </div>
-              )}
-            </div>
-
-            <div className="fb-sidebar-bottom">
-              <div className="fb-logout" onClick={handleLogout}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 5h5v14h-5"/><path d="M3 12h11M11 8l4 4-4 4"/>
-                </svg>
-                {isGuest ? "sign in" : "logout"}
-              </div>
-            </div>
-          </aside>
 
           {/* ── MAIN CONTENT ───────────────────────────────────────────────── */}
           <div className="fb-main">

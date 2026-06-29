@@ -10,8 +10,9 @@ const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models
 const VALID_MOODS = new Set(['empty', 'overwhelmed', 'okayish', 'heavy', 'full'])
 
 // ── ML fallback service ───────────────────────────────────────────────────────
-// Local Flask server started separately. Expects POST { text }, returns { mood, confidence, source }.
-const ML_ENDPOINT = 'http://localhost:5000/predict'
+// Optional: set ML_ENDPOINT in .env.local to enable a deployed Flask fallback.
+// Unset in production (Vercel) — the ML fallback is simply skipped.
+const ML_ENDPOINT = process.env.ML_ENDPOINT || null
 
 // ── Gemini system instruction ─────────────────────────────────────────────────
 // Short and strict: we only want one word back, nothing else.
@@ -95,7 +96,7 @@ async function tryGemini(text) {
 async function tryMLFallback(text) {
   console.log('[detect-mood] trying ML fallback at', ML_ENDPOINT)
 
-  const mlRes = await fetch(ML_ENDPOINT, {
+  const mlRes = await fetch(ML_ENDPOINT /* set via env var */, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({ text }),
@@ -148,13 +149,15 @@ export async function POST(request) {
       return NextResponse.json({ mood: geminiMood, source: 'gemini' })
     }
 
-    // ── Step 2: Gemini failed — try the local ML service ─────────────────────
+    // ── Step 2: Gemini failed — try the ML service if configured ─────────────
     console.log('[detect-mood] Gemini unavailable — trying ML fallback...')
 
-    const mlResult = await tryMLFallback(text).catch(err => {
-      console.error('[detect-mood] ML fallback threw unexpectedly:', err)
-      return null
-    })
+    const mlResult = ML_ENDPOINT
+      ? await tryMLFallback(text).catch(err => {
+          console.error('[detect-mood] ML fallback threw unexpectedly:', err)
+          return null
+        })
+      : null
 
     if (mlResult) {
       console.log('[detect-mood] ✓ serving from ML-FALLBACK — mood:', mlResult.mood)
