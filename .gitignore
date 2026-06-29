@@ -24,6 +24,12 @@
 .DS_Store
 *.pem
 
+# VS Code Local History extension
+.history/
+
+# Claude Code local config
+.claude/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

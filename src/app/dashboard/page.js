@@ -181,10 +181,10 @@ const MOOD_COLORS = {
 }
 
 const SOUND_CHIPS = [
-  { id: "ocean",   label: "ocean waves", src: "/ocean.mp3.mp3"  },
-  { id: "rain",    label: "rain",        src: "/rain.mp3.mp3"   },
-  { id: "forest",  label: "forest",      src: "/forest.mp3.mp3" },
-  { id: "silence", label: "silence",     src: null              },
+  { id: "ocean",   label: "ocean waves", src: "/ocean.mp3"  },
+  { id: "rain",    label: "rain",        src: "/rain.mp3"   },
+  { id: "forest",  label: "forest",      src: "/forest.mp3" },
+  { id: "silence", label: "silence",     src: null          },
 ]
 
 const WHISPER_PROMPTS = [
