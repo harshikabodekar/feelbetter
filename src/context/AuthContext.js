@@ -59,7 +59,8 @@ export function AuthProvider({ children }) {
     if (err) setError(err.message)
   }
 
-  const signInAsGuest = () => {
+  const signInAsGuest = async () => {
+    await supabase.auth.signOut()
     localStorage.setItem('isGuest', 'true')
     localStorage.setItem('guestName', 'there')
   }

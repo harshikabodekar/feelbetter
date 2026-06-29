@@ -47,7 +47,7 @@ export default function LoginPage() {
   }
 
   const handleGoogle = async () => { setError(''); await signInWithGoogle() }
-  const handleGuest  = ()      => { signInAsGuest(); router.push('/dashboard') }
+  const handleGuest  = async () => { await signInAsGuest(); router.push('/dashboard') }
 
   // ── Shared styles ────────────────────────────────────────────────────────────
   // Input padding is tighter on mobile: 0.62rem top/bottom ≈ 10px — still a

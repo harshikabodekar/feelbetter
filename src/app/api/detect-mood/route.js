@@ -51,21 +51,30 @@ async function tryGemini(text) {
 }
 
 
-// ── tryMLFallback — call the local Flask ML service ──────────────────────────
-// Returns { mood, confidence, source } if successful, or null if it's unreachable.
+// ── tryMLFallback — call the deployed ML service ─────────────────────────────
+// Returns { mood, confidence, source } if successful, or null on any failure.
+// Hard timeout: 3 s — if the service doesn't respond, abort and fall through.
 async function tryMLFallback(text) {
-  const mlRes = await fetch(ML_ENDPOINT, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ text }),
-  })
+  const controller = new AbortController()
+  const timeoutId  = setTimeout(() => controller.abort(), 3000)
 
-  if (!mlRes.ok) return null
+  try {
+    const mlRes = await fetch(ML_ENDPOINT, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text }),
+      signal:  controller.signal,
+    })
 
-  const data = await mlRes.json()
-  if (!data?.mood || !VALID_MOODS.has(data.mood)) return null
+    if (!mlRes.ok) return null
 
-  return data
+    const data = await mlRes.json()
+    if (!data?.mood || !VALID_MOODS.has(data.mood)) return null
+
+    return data
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 

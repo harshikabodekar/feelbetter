@@ -1390,8 +1390,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Guest flag wins over any cached Supabase session.
-    // signInAsGuest() doesn't sign out Supabase, so user may still be non-null here.
-    // Checking the flag first prevents the previous user's name/data from leaking in.
     const guestFlag = localStorage.getItem("isGuest") === "true"
     if (guestFlag) {
       setIsGuest(true)
