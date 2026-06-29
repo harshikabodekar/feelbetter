@@ -180,6 +180,13 @@ const MOOD_COLORS = {
   okayish: "#7a8a6f", heavy: "#6b5fa3", full: "#e08a3c",
 }
 
+const SOUND_CHIPS = [
+  { id: "ocean",   label: "ocean waves", src: "/ocean.mp3"  },
+  { id: "rain",    label: "rain",        src: "/rain.mp3"   },
+  { id: "forest",  label: "forest",      src: "/forest.mp3" },
+  { id: "silence", label: "silence",     src: null          },
+]
+
 const WHISPER_PROMPTS = [
   "what's one thing you're carrying right now that no one knows about?",
   "what have you been pretending is fine?",
@@ -1369,12 +1376,16 @@ export default function Dashboard() {
   const [detectLoading, setDetectLoading] = useState(false)  // API call in flight
   const [detectError,   setDetectError]   = useState(null)   // soft error message
   const [detectReveal,  setDetectReveal]  = useState(null)   // detected mood shown in reveal step
+  const [winddownOpen,   setWinddownOpen]   = useState(false)
+  const [storyPage,      setStoryPage]      = useState(0)
   const [whisperOpen,    setWhisperOpen]    = useState(false)
   const [whisperPrompt,  setWhisperPrompt]  = useState("")
   const [whisperText,    setWhisperText]    = useState("")
   const [whisperLoading, setWhisperLoading] = useState(false)
   const [whisperReply,   setWhisperReply]   = useState(null)
+  const [activeSound,    setActiveSound]    = useState(null)
   const clusterWrapRef = useRef(null)
+  const audioRef       = useRef(null)
 
   useEffect(() => {
     // Guest flag wins over any cached Supabase session.
@@ -1415,10 +1426,33 @@ export default function Dashboard() {
     }
     check()
     window.addEventListener("resize", check)
-    return () => { clearInterval(t); window.removeEventListener("resize", check) }
+    return () => {
+      clearInterval(t)
+      window.removeEventListener("resize", check)
+      // Stop ambient audio when the component unmounts (navigation away)
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    }
   }, [])
 
   const handleLogout = async () => { await signOut(); router.push("/login") }
+
+  function handleSoundChip(id, src) {
+    const stopCurrent = () => {
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    }
+    // Silence chip or toggling the active chip off
+    if (!src || activeSound === id) { stopCurrent(); setActiveSound(null); return }
+    // Switch to a new sound
+    stopCurrent()
+    try {
+      const audio = new Audio(src)
+      audio.loop   = true
+      audio.volume = 0.5
+      audioRef.current = audio
+      audio.play().catch(() => { audioRef.current = null; setActiveSound(null) })
+      setActiveSound(id)
+    } catch { setActiveSound(null) }
+  }
 
   const fullName  = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "there"
   const firstName = fullName.split(" ")[0]
@@ -1577,6 +1611,7 @@ export default function Dashboard() {
         .fb-mood-dot{width:20px;height:20px;border-radius:50%;cursor:pointer;transition:transform .2s}
         .fb-mood-dot:hover{transform:scale(1.15)}
         @keyframes fbDotPulse{0%,100%{opacity:.28}50%{opacity:.65}}
+        @keyframes fbSoundPulse{0%,100%{box-shadow:0 3px 12px rgba(94,180,194,.3)}50%{box-shadow:0 3px 22px rgba(94,180,194,.6)}}
         .fb-history-item{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:rgba(255,255,255,.5);border-radius:12px;cursor:pointer;font-size:14px;color:#1a3a42;transition:background .2s;border:.5px solid rgba(255,255,255,.7)}
         .fb-history-item:hover{background:rgba(255,255,255,.82)}
         .fb-lock-icon{width:15px;height:15px;flex-shrink:0;color:#7a9aaa}
@@ -1922,9 +1957,38 @@ export default function Dashboard() {
               ambient sound
             </div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-              {["ocean waves","rain","forest","silence"].map((s, i) => (
-                <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:13, padding:"6px 12px", borderRadius:20, cursor:"pointer", border:".5px solid rgba(255,255,255,.7)", transition:"background .18s" }}>{s}</span>
-              ))}
+              {SOUND_CHIPS.map(chip => {
+                const active = activeSound === chip.id
+                return (
+                  <span
+                    key={chip.id}
+                    onClick={() => handleSoundChip(chip.id, chip.src)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      background: active
+                        ? "linear-gradient(135deg,#5eb4c2,#7bbac4)"
+                        : "rgba(255,255,255,.6)",
+                      color:  active ? "#fff" : "#4a5d64",
+                      fontSize: 13, padding: "6px 12px", borderRadius: 20,
+                      cursor: "pointer",
+                      border: active
+                        ? ".5px solid rgba(94,180,194,.4)"
+                        : ".5px solid rgba(255,255,255,.7)",
+                      transition: "background .2s, box-shadow .2s, color .2s",
+                      animation: active ? "fbSoundPulse 2.5s ease-in-out infinite" : "none",
+                      userSelect: "none",
+                    }}
+                  >
+                    {active && (
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor">
+                        <rect x="1" y="1" width="3" height="8" rx="1"/>
+                        <rect x="6" y="1" width="3" height="8" rx="1"/>
+                      </svg>
+                    )}
+                    {chip.label}
+                  </span>
+                )
+              })}
             </div>
           </div>
           <div className="fb-sidebar-section">
@@ -2219,7 +2283,7 @@ export default function Dashboard() {
                 <div className="fb-winddown-title">a 9-minute story for sleep</div>
                 <div className="fb-winddown-sub">&#34;the quiet harbor&#34; · narrated softly</div>
                 <div className="fb-winddown-actions">
-                  <button className="fb-play-btn">
+                  <button className="fb-play-btn" onClick={() => { setStoryPage(0); setWinddownOpen(true) }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     play
                   </button>
@@ -2436,6 +2500,138 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          WIND-DOWN STORY PLAYER — outside fb-root, z-index 325.
+          Pages through "the quiet harbor" story with prev/next navigation.
+          Nothing saved. Close button dismisses.
+          ══════════════════════════════════════════════════════════════════════ */}
+      {winddownOpen && (() => {
+        const pages = [
+          "close your eyes when you're ready. there's no rush.",
+          "you're at the edge of a quiet harbor. the water is still. the last light of the day is sitting low on the horizon, orange and unhurried.",
+          "a small boat is tied to the dock. it moves gently — just enough to remind you that the water is alive beneath it.",
+          "the air smells like salt and something soft, like the end of a long week finally exhaling.",
+          "you don't have to do anything here. no decisions. no catch-up. just the sound of small waves finding the shore.",
+          "somewhere far out, a light blinks slowly. a lighthouse, maybe. patient. consistent. it doesn't need you to watch it to keep doing its job.",
+          "your breath is starting to follow the water. in with the wave. out as it pulls back. you don't have to try — it just happens.",
+          "the harbor is getting quieter now. the boats are settling. the light is almost gone.",
+          "you're safe here. nothing to solve. nothing to carry. just this — the end of the day, the still water, and you.",
+          "let yourself sink a little. into the dock. into the dark. into sleep.",
+        ]
+        const isFirst = storyPage === 0
+        const isLast  = storyPage === pages.length - 1
+        return (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 325,
+            background: "linear-gradient(180deg,#0d1f2d 0%,#1a3242 60%,#0f2535 100%)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            fontFamily: "var(--font-dm-sans), sans-serif",
+            padding: "40px 24px",
+          }}>
+
+            {/* Close */}
+            <button
+              onClick={() => setWinddownOpen(false)}
+              style={{
+                position: "absolute", top: 24, right: 24,
+                width: 44, height: 44, borderRadius: "50%",
+                background: "rgba(255,255,255,.08)",
+                border: ".5px solid rgba(255,255,255,.15)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", transition: "background .2s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.16)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+
+            {/* Progress dots */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 48 }}>
+              {pages.map((_, i) => (
+                <div key={i} style={{
+                  width: i === storyPage ? 20 : 6,
+                  height: 6, borderRadius: 3,
+                  background: i === storyPage
+                    ? "rgba(120,190,210,.9)"
+                    : i < storyPage ? "rgba(120,190,210,.35)" : "rgba(255,255,255,.12)",
+                  transition: "all .4s ease",
+                }} />
+              ))}
+            </div>
+
+            {/* Story text */}
+            <div style={{
+              maxWidth: 520, textAlign: "center",
+              fontFamily: "var(--font-dm-serif), serif",
+              fontSize: "clamp(22px, 3.5vw, 32px)",
+              color: "rgba(220,240,248,.92)",
+              lineHeight: 1.5, fontWeight: 400,
+              letterSpacing: ".2px",
+            }}>
+              {pages[storyPage]}
+            </div>
+
+            {/* Nav */}
+            <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 56 }}>
+              <button
+                onClick={() => setStoryPage(p => Math.max(0, p - 1))}
+                disabled={isFirst}
+                style={{
+                  width: 48, height: 48, borderRadius: "50%",
+                  background: isFirst ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.1)",
+                  border: ".5px solid rgba(255,255,255,.12)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: isFirst ? "default" : "pointer", transition: "background .2s",
+                  opacity: isFirst ? 0.3 : 1,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(200,230,240,.8)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+
+              <span style={{ fontSize: 13, color: "rgba(150,200,215,.6)", letterSpacing: "1px" }}>
+                {storyPage + 1} / {pages.length}
+              </span>
+
+              {!isLast ? (
+                <button
+                  onClick={() => setStoryPage(p => p + 1)}
+                  style={{
+                    width: 48, height: 48, borderRadius: "50%",
+                    background: "rgba(94,180,194,.2)",
+                    border: ".5px solid rgba(94,180,194,.3)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", transition: "background .2s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(94,180,194,.35)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(94,180,194,.2)"}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(200,230,240,.8)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setWinddownOpen(false)}
+                  style={{
+                    padding: "12px 24px", borderRadius: 24,
+                    background: "rgba(94,180,194,.25)",
+                    border: ".5px solid rgba(94,180,194,.35)",
+                    color: "rgba(200,235,245,.9)", fontSize: 14,
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                    cursor: "pointer", transition: "background .2s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(94,180,194,.38)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(94,180,194,.25)"}
+                >
+                  sleep well ✦
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ══════════════════════════════════════════════════════════════════════
           ENTRIES HISTORY PANEL — full-screen, outside the scaled fb-root so
