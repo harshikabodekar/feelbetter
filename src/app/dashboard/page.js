@@ -1571,10 +1571,10 @@ export default function Dashboard() {
         .fb-root{
           font-family:var(--font-dm-sans),sans-serif;
           background:linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%);
-          min-height:100vh;color:#1a3a42;
+          color:#1a3a42;
           display:flex;flex-direction:column;overflow-x:hidden;
         }
-        .fb-wrapper{display:flex;flex:1;position:relative}
+        .fb-wrapper{display:flex;position:relative}
 
         /* ── Mood overlay animations ───────────────────────────────────────────── */
         @keyframes fbFloat{0%{transform:translateY(12px);opacity:0}25%{opacity:.85}100%{transform:translateY(-70px);opacity:0}}
@@ -2315,10 +2315,10 @@ export default function Dashboard() {
               onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
             >
               <div>
-                <div style={{ fontSize:11, letterSpacing:2, textTransform:"uppercase", color:"#6a9aaa", fontWeight:600, marginBottom:8 }}>ACTIVITIES</div>
-                <div style={{ fontSize:18, color:"#3c4f57", fontWeight:300, lineHeight:1.45 }}>something small to do right now</div>
+                <div style={{ fontSize:14, letterSpacing:2, textTransform:"uppercase", color:"#6a9aaa", fontWeight:600, marginBottom:10 }}>ACTIVITIES</div>
+                <div style={{ fontSize:28, color:"#3c4f57", fontWeight:300, lineHeight:1.4 }}>something small to do right now</div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:8, color:"#4a8a96", fontSize:15, fontWeight:400, flexShrink:0 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, color:"#4a8a96", fontSize:18, fontWeight:400, flexShrink:0 }}>
                 explore
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </div>
