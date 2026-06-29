@@ -180,6 +180,19 @@ const MOOD_COLORS = {
   okayish: "#7a8a6f", heavy: "#6b5fa3", full: "#e08a3c",
 }
 
+const WHISPER_PROMPTS = [
+  "what's one thing you're carrying right now that no one knows about?",
+  "what have you been pretending is fine?",
+  "if you could put today into one honest word, what would it be?",
+  "what do you wish someone had said to you today?",
+  "what's something you haven't let yourself feel yet?",
+  "what's quietly weighing on you that you keep pushing aside?",
+  "what would you tell yourself if you weren't trying to be okay?",
+  "what's something you've been holding in since yesterday?",
+  "what feels true right now that you haven't said out loud?",
+  "if your body could speak, what would it say it needs right now?",
+]
+
 // ── Entries panel helpers ─────────────────────────────────────────────────────
 
 // "Jun 23, 9:34pm" — date + time in one readable string
@@ -1356,6 +1369,11 @@ export default function Dashboard() {
   const [detectLoading, setDetectLoading] = useState(false)  // API call in flight
   const [detectError,   setDetectError]   = useState(null)   // soft error message
   const [detectReveal,  setDetectReveal]  = useState(null)   // detected mood shown in reveal step
+  const [whisperOpen,    setWhisperOpen]    = useState(false)
+  const [whisperPrompt,  setWhisperPrompt]  = useState("")
+  const [whisperText,    setWhisperText]    = useState("")
+  const [whisperLoading, setWhisperLoading] = useState(false)
+  const [whisperReply,   setWhisperReply]   = useState(null)
   const clusterWrapRef = useRef(null)
 
   useEffect(() => {
@@ -1420,6 +1438,32 @@ export default function Dashboard() {
     }
   }
   function closeOverlay() { setMoodOverlay(null); setOverlayState(1) }
+
+  function openWhisper() {
+    const prompt = WHISPER_PROMPTS[Math.floor(Math.random() * WHISPER_PROMPTS.length)]
+    setWhisperPrompt(prompt)
+    setWhisperText("")
+    setWhisperReply(null)
+    setWhisperOpen(true)
+  }
+
+  async function handleWhisperSubmit() {
+    if (!whisperText.trim() || whisperLoading) return
+    setWhisperLoading(true)
+    try {
+      const res = await fetch('/api/whisper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: whisperPrompt, text: whisperText }),
+      })
+      const data = await res.json()
+      setWhisperReply(data.response)
+    } catch {
+      setWhisperReply("i read every word. whatever you're carrying right now doesn't have to make sense — it's real, and so are you.")
+    } finally {
+      setWhisperLoading(false)
+    }
+  }
 
   // Sends text to /api/detect-mood, then shows the reveal step (not the experience yet).
   // The user reads the detected mood and chooses to "take me there" before the experience opens.
@@ -2149,7 +2193,7 @@ export default function Dashboard() {
             </div>
 
             {/* WHISPER CARD */}
-            <div className="fb-whisper-card">
+            <div className="fb-whisper-card" onClick={openWhisper}>
               <div className="fb-whisper-icon">
                 <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#3a7e8a" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 5c3-1 6-1 8 0 2-1 5-1 8 0v14c-3-1-6-1-8 0-2-1-5-1-8 0V5z"/>
@@ -2160,7 +2204,7 @@ export default function Dashboard() {
                 <div className="fb-whisper-label">WHISPER A THOUGHT</div>
                 <div className="fb-whisper-desc">no one reads it but you.</div>
               </div>
-              <button className="fb-open-btn">open</button>
+              <button className="fb-open-btn" onClick={e => { e.stopPropagation(); openWhisper() }}>open</button>
             </div>
 
             {/* WIND-DOWN CARD */}
@@ -2206,6 +2250,192 @@ export default function Dashboard() {
 
         <div className="fb-footer">whatever you&#39;re feeling, it&#39;s welcome here.</div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          WHISPER OVERLAY — ephemeral, nothing saved, outside fb-root so
+          position:fixed anchors to the true viewport.
+          z-index 330: above sidebar (200), below entries panel (350).
+          ══════════════════════════════════════════════════════════════════════ */}
+      {whisperOpen && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 330,
+          background: "linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "var(--font-dm-sans), sans-serif",
+          color: "#1a3a42",
+          padding: "24px",
+        }}>
+
+          {/* Close ✕ */}
+          <button
+            onClick={() => setWhisperOpen(false)}
+            style={{
+              position: "absolute", top: 24, right: 24,
+              width: 44, height: 44, borderRadius: "50%",
+              background: "rgba(255,255,255,.72)",
+              backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+              border: ".5px solid rgba(255,255,255,.88)",
+              boxShadow: "0 2px 14px rgba(60,120,140,.14)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", transition: "background .2s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.72)"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2a5a66" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+
+          {/* Glass card */}
+          <div style={{
+            width: "100%", maxWidth: 520,
+            background: "rgba(255,255,255,.68)",
+            backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
+            border: ".5px solid rgba(255,255,255,.92)",
+            borderRadius: 32,
+            padding: "48px 40px 44px",
+            boxShadow: "0 12px 50px rgba(60,120,140,.13)",
+            display: "flex", flexDirection: "column",
+          }}>
+
+            {/* Label */}
+            <div style={{
+              fontSize: 11, letterSpacing: "2.5px", textTransform: "uppercase",
+              color: "#4a8a96", fontWeight: 500, marginBottom: 22,
+            }}>
+              WHISPER A THOUGHT
+            </div>
+
+            {!whisperReply ? (
+              <>
+                {/* Prompt */}
+                <div style={{
+                  fontFamily: "var(--font-dm-serif), serif",
+                  fontSize: "clamp(22px, 4vw, 30px)",
+                  color: "#0f2e35", lineHeight: 1.25, marginBottom: 30, fontWeight: 400,
+                }}>
+                  {whisperPrompt}
+                </div>
+
+                {/* Textarea */}
+                <textarea
+                  value={whisperText}
+                  onChange={e => setWhisperText(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleWhisperSubmit() }}
+                  placeholder="write whatever comes first — no one reads this but you."
+                  autoFocus
+                  disabled={whisperLoading}
+                  rows={5}
+                  style={{
+                    width: "100%", resize: "vertical",
+                    background: "rgba(255,255,255,.5)",
+                    border: ".5px solid rgba(80,160,170,.25)",
+                    borderRadius: 16, padding: "16px 18px",
+                    fontSize: 16, fontFamily: "var(--font-dm-sans), sans-serif",
+                    color: "#1a3a42", lineHeight: 1.65,
+                    outline: "none", marginBottom: 24,
+                    transition: "border-color .2s",
+                  }}
+                  onFocus={e => e.target.style.borderColor = "rgba(80,160,170,.55)"}
+                  onBlur={e => e.target.style.borderColor = "rgba(80,160,170,.25)"}
+                />
+
+                {/* Submit */}
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <button
+                    onClick={handleWhisperSubmit}
+                    disabled={!whisperText.trim() || whisperLoading}
+                    style={{
+                      background: whisperText.trim() && !whisperLoading
+                        ? "linear-gradient(135deg,#5fa0ac,#7bbac4)"
+                        : "rgba(180,205,212,.5)",
+                      color: whisperText.trim() && !whisperLoading ? "#fff" : "#8aaab4",
+                      border: "none", borderRadius: 26,
+                      padding: "13px 32px", fontSize: 15,
+                      fontFamily: "var(--font-dm-sans), sans-serif",
+                      cursor: whisperText.trim() && !whisperLoading ? "pointer" : "default",
+                      transition: "all .2s",
+                      boxShadow: whisperText.trim() && !whisperLoading
+                        ? "0 6px 20px rgba(95,160,172,.3)" : "none",
+                    }}
+                  >
+                    {whisperLoading ? "sitting with you…" : "whisper it"}
+                  </button>
+                  {whisperLoading && (
+                    <span style={{ fontSize: 13, color: "#7a9aaa", fontStyle: "italic" }}>
+                      one moment…
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Faint echo of the prompt */}
+                <div style={{
+                  fontSize: 13, color: "#7a9aaa", fontWeight: 300,
+                  fontStyle: "italic", lineHeight: 1.5, marginBottom: 24,
+                }}>
+                  {whisperPrompt}
+                </div>
+
+                {/* Gemini reply */}
+                <div style={{
+                  fontFamily: "var(--font-dm-serif), serif",
+                  fontSize: "clamp(19px, 3.2vw, 26px)",
+                  color: "#1a3a42", lineHeight: 1.55, marginBottom: 36,
+                }}>
+                  {whisperReply}
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+                  <button
+                    onClick={() => { setWhisperReply(null); setWhisperText("") }}
+                    style={{
+                      background: "rgba(255,255,255,.72)",
+                      border: ".5px solid rgba(80,160,170,.3)",
+                      borderRadius: 22, padding: "10px 24px",
+                      fontSize: 14, fontFamily: "var(--font-dm-sans), sans-serif",
+                      color: "#3a7a88", cursor: "pointer",
+                      transition: "background .2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.72)"}
+                  >
+                    write more
+                  </button>
+                  <button
+                    onClick={openWhisper}
+                    style={{
+                      background: "none", border: "none",
+                      fontSize: 14, color: "#7a9aaa",
+                      fontFamily: "var(--font-dm-sans), sans-serif",
+                      cursor: "pointer", padding: "10px 4px",
+                      textDecoration: "underline",
+                      textDecorationColor: "rgba(122,154,170,.4)",
+                    }}
+                  >
+                    new prompt
+                  </button>
+                  <button
+                    onClick={() => setWhisperOpen(false)}
+                    style={{
+                      background: "none", border: "none",
+                      fontSize: 14, color: "#7a9aaa",
+                      fontFamily: "var(--font-dm-sans), sans-serif",
+                      cursor: "pointer", padding: "10px 4px",
+                      marginLeft: "auto",
+                    }}
+                  >
+                    close
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           ENTRIES HISTORY PANEL — full-screen, outside the scaled fb-root so
