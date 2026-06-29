@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { MOOD_ACTIVITIES, ACTIVITY_MAP } from "@/app/activities/data"
-import { saveMood, fetchLast7Days, fetchJournalEntries, fetchVoiceNotes, getSignedUrl } from "@/lib/supabase"
+import { saveMood, fetchLast7Days, fetchJournalEntries, fetchVoiceNotes, getSignedUrl, deleteJournalEntry, deleteVoiceNote } from "@/lib/supabase"
+import { hasPin, verifyPin } from "@/lib/pin"
 
 /* ── Mood overlay data (state 1 → state 2) ──────────────────── */
 const MOOD_SCREENS = {
@@ -286,8 +287,8 @@ function EntryShimmer() {
   )
 }
 
-// Empty state card with a heading and optional sub-line
-function PanelEmptyState({ text, sub }) {
+// Empty state card with a heading, optional sub-line, and optional CTA button
+function PanelEmptyState({ text, sub, onCta, ctaLabel }) {
   return (
     <div style={{
       background: "rgba(255,255,255,.5)",
@@ -302,6 +303,22 @@ function PanelEmptyState({ text, sub }) {
       }}>{text}</p>
       {sub && (
         <p style={{ marginTop: 8, fontSize: 14, color: "#8aaab2", fontWeight: 300 }}>{sub}</p>
+      )}
+      {onCta && ctaLabel && (
+        <button
+          onClick={onCta}
+          style={{
+            marginTop: 20, background: "rgba(90,160,180,.13)", border: "none",
+            borderRadius: 20, padding: "10px 22px",
+            fontSize: 13, color: "#4a8a96", fontWeight: 500,
+            cursor: "pointer", fontFamily: "var(--font-dm-sans), sans-serif",
+            transition: "background .18s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(90,160,180,.24)"}
+          onMouseLeave={e => e.currentTarget.style.background = "rgba(90,160,180,.13)"}
+        >
+          {ctaLabel}
+        </button>
       )}
     </div>
   )
@@ -335,10 +352,26 @@ function PanelSectionLabel({ icon, color, text }) {
   )
 }
 
-// A single journal entry card — mood dot + date + content preview
-function EntryCard({ entry }) {
+// A single journal entry card — mood dot + date + content preview + optional delete
+function EntryCard({ entry, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting,      setDeleting]      = useState(false)
+
   const preview = (entry.content || "").slice(0, 240)
     + ((entry.content || "").length > 240 ? "…" : "")
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await deleteJournalEntry(entry.id)
+      onDelete?.(entry.id)
+    } catch {
+      setConfirmDelete(false)  // reset on error; silently fails (entry stays visible)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div style={{
       background: "rgba(255,255,255,.58)",
@@ -357,6 +390,57 @@ function EntryCard({ entry }) {
         <span style={{ marginLeft: "auto", fontSize: 12, color: "#9aacb0", whiteSpace: "nowrap" }}>
           {fmtDate(entry.created_at)}
         </span>
+        {/* Delete control — trash icon → inline confirm row */}
+        {onDelete && !confirmDelete && (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            title="remove"
+            style={{
+              background: "none", border: "none", padding: "2px 4px",
+              cursor: "pointer", color: "#b0bec5", lineHeight: 1,
+              transition: "color .15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = "#c05a5a"}
+            onMouseLeave={e => e.currentTarget.style.color = "#b0bec5"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+          </button>
+        )}
+        {onDelete && confirmDelete && (
+          <span style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 4 }}>
+            <button
+              onClick={handleDelete} disabled={deleting}
+              style={{
+                background: "none", border: "none", padding: 0,
+                fontSize: 12, color: "#c05a5a", cursor: deleting ? "default" : "pointer",
+                fontFamily: "var(--font-dm-sans), sans-serif",
+              }}
+            >
+              {deleting ? "removing…" : "remove"}
+            </button>
+            {!deleting && (
+              <>
+                <span style={{ color: "#ccc", fontSize: 11 }}>·</span>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  style={{
+                    background: "none", border: "none", padding: 0,
+                    fontSize: 12, color: "#9aacb0", cursor: "pointer",
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                  }}
+                >
+                  cancel
+                </button>
+              </>
+            )}
+          </span>
+        )}
       </div>
       <p style={{ fontSize: 15, fontWeight: 300, color: "#2a3838", lineHeight: 1.8, margin: 0 }}>
         {preview}
@@ -365,10 +449,12 @@ function EntryCard({ entry }) {
   )
 }
 
-// Voice note card — generates signed URL lazily; shows audio player on success
-function VoiceNoteCard({ note }) {
-  const [url,        setUrl]        = useState(null)
-  const [urlLoading, setUrlLoading] = useState(true)
+// Voice note card — generates signed URL lazily; shows audio player on success + optional delete
+function VoiceNoteCard({ note, onDelete }) {
+  const [url,           setUrl]           = useState(null)
+  const [urlLoading,    setUrlLoading]    = useState(true)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting,      setDeleting]      = useState(false)
 
   useEffect(() => {
     getSignedUrl(note.file_path)
@@ -379,6 +465,18 @@ function VoiceNoteCard({ note }) {
       .catch(err => console.error('[feelbetter] VoiceNoteCard getSignedUrl:', err))
       .finally(() => setUrlLoading(false))
   }, [note.file_path])
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await deleteVoiceNote(note.id, note.file_path)
+      onDelete?.(note.id)
+    } catch {
+      setConfirmDelete(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div style={{
@@ -398,6 +496,57 @@ function VoiceNoteCard({ note }) {
         <span style={{ marginLeft: "auto", fontSize: 12, color: "#9aacb0", whiteSpace: "nowrap" }}>
           {fmtDate(note.created_at)}
         </span>
+        {/* Delete control */}
+        {onDelete && !confirmDelete && (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            title="remove"
+            style={{
+              background: "none", border: "none", padding: "2px 4px",
+              cursor: "pointer", color: "#b0bec5", lineHeight: 1,
+              transition: "color .15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = "#c05a5a"}
+            onMouseLeave={e => e.currentTarget.style.color = "#b0bec5"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+          </button>
+        )}
+        {onDelete && confirmDelete && (
+          <span style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 4 }}>
+            <button
+              onClick={handleDelete} disabled={deleting}
+              style={{
+                background: "none", border: "none", padding: 0,
+                fontSize: 12, color: "#c05a5a", cursor: deleting ? "default" : "pointer",
+                fontFamily: "var(--font-dm-sans), sans-serif",
+              }}
+            >
+              {deleting ? "removing…" : "remove"}
+            </button>
+            {!deleting && (
+              <>
+                <span style={{ color: "#ccc", fontSize: 11 }}>·</span>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  style={{
+                    background: "none", border: "none", padding: 0,
+                    fontSize: 12, color: "#9aacb0", cursor: "pointer",
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                  }}
+                >
+                  cancel
+                </button>
+              </>
+            )}
+          </span>
+        )}
       </div>
       {urlLoading
         ? <p style={{ fontSize: 13, color: "#9aacb0", fontStyle: "italic" }}>loading audio...</p>
@@ -405,6 +554,81 @@ function VoiceNoteCard({ note }) {
           ? <audio src={url} controls style={{ width: "100%", borderRadius: 8, outline: "none" }} />
           : <p style={{ fontSize: 13, color: "#9a8090", fontStyle: "italic" }}>couldn&apos;t load this recording</p>
       }
+    </div>
+  )
+}
+
+// ── PanelPinBoxes — 4 visual PIN boxes for the entries lock gate ──────────────
+// Hidden <input type="tel"> captures keyboard input (mobile + desktop).
+// Visual boxes show filled dots for entered digits.
+// Defined outside EntriesPanel so React treats it as a stable component.
+function PanelPinBoxes({ value, onChange, onComplete, autoFocus, disabled, hasError }) {
+  const inputRef = useRef(null)
+
+  // Focus the hidden input when the lock screen first appears
+  useEffect(() => {
+    if (autoFocus && !disabled) {
+      const t = setTimeout(() => inputRef.current?.focus(), 80)
+      return () => clearTimeout(t)
+    }
+  }, [autoFocus, disabled])
+
+  function handleChange(e) {
+    // Strip non-digits and cap at 4 characters
+    const v = e.target.value.replace(/\D/g, '').slice(0, 4)
+    onChange(v)
+    // Auto-submit when the 4th digit is entered
+    if (v.length === 4) onComplete(v)
+  }
+
+  return (
+    <div
+      style={{ display: "flex", gap: 14, cursor: disabled ? "default" : "text" }}
+      onClick={() => !disabled && inputRef.current?.focus()}
+    >
+      {/* Hidden native input — captures real keyboard + mobile numpad */}
+      <input
+        ref={inputRef}
+        type="tel"
+        inputMode="numeric"
+        maxLength={4}
+        value={value}
+        onChange={handleChange}
+        disabled={disabled}
+        autoComplete="off"
+        style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }}
+        aria-label="4-digit PIN"
+      />
+
+      {/* 4 visual boxes */}
+      {[0, 1, 2, 3].map(i => {
+        const filled = i < value.length
+        const active = i === value.length && !disabled
+        return (
+          <div key={i} style={{
+            width: 56, height: 66, borderRadius: 16,
+            background: hasError ? "rgba(192,90,90,.07)" : "rgba(255,255,255,.62)",
+            border: hasError
+              ? "1.5px solid rgba(192,90,90,.38)"
+              : active
+                ? "1.5px solid rgba(90,170,190,.72)"
+                : filled
+                  ? "1.5px solid rgba(90,170,190,.44)"
+                  : ".5px solid rgba(60,120,140,.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "border .13s, box-shadow .13s",
+            boxShadow: active && !hasError ? "0 0 0 3px rgba(90,170,190,.13)" : "none",
+          }}>
+            {filled && (
+              <div style={{
+                width: 11, height: 11, borderRadius: "50%",
+                background: hasError ? "rgba(192,90,90,.55)" : "#5aaabb",
+                transition: "background .13s",
+              }} />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -418,6 +642,17 @@ function VoiceNoteCard({ note }) {
 // Renders outside the scaled fb-root so position:fixed covers the true viewport.
 // ─────────────────────────────────────────────────────────────────────────────
 function EntriesPanel({ userId, onClose, pageScale }) {
+  const router = useRouter()
+
+  // ── PIN gate state ──────────────────────────────────────────────────────────
+  // pinChecked:  true once we know whether this user has a PIN (avoids flash)
+  // pinUnlocked: true either because no PIN exists, or because user verified it
+  const [pinChecked,     setPinChecked]     = useState(false)
+  const [pinUnlocked,    setPinUnlocked]    = useState(false)
+  const [pinLockValue,   setPinLockValue]   = useState('')    // current box input
+  const [pinLockError,   setPinLockError]   = useState(null)  // error string | null
+  const [pinLockLoading, setPinLockLoading] = useState(false) // verifyPin in flight
+
   // Drives the two-level nav
   const [panelView, setPanelView] = useState("home")
 
@@ -425,25 +660,29 @@ function EntriesPanel({ userId, onClose, pageScale }) {
   const [spillLoading, setSpillLoading] = useState(false)
   const [spillEntries, setSpillEntries] = useState([])
   const [spillKey,     setSpillKey]     = useState(0)   // increment → force re-fetch
+  const [spillError,   setSpillError]   = useState(false)
 
   // ── Pages ──
   const [pagesLoading, setPagesLoading] = useState(false)
   const [pagesWriting, setPagesWriting] = useState([])
   const [pagesVoices,  setPagesVoices]  = useState([])
   const [pagesKey,     setPagesKey]     = useState(0)
+  const [pagesError,   setPagesError]   = useState(false)
 
   // ── Compass ──
   const [compassLoading, setCompassLoading] = useState(false)
   const [compassEntries, setCompassEntries] = useState([])
   const [compassKey,     setCompassKey]     = useState(0)
+  const [compassError,   setCompassError]   = useState(false)
 
   // Load spill entries when entering the spill drill-in
   useEffect(() => {
     if (panelView !== "spill" || !userId) return
     setSpillLoading(true)
+    setSpillError(false)
     fetchJournalEntries(userId, { activity: "spill" })
-      .catch(err => { console.error('[feelbetter] entries spill:', err); return [] })
-      .then(data => setSpillEntries(data || []))
+      .then(data => { setSpillEntries(data || []); setSpillError(false) })
+      .catch(err => { console.error('[feelbetter] entries spill:', err); setSpillError(true) })
       .finally(() => setSpillLoading(false))
   }, [panelView, userId, spillKey])
 
@@ -451,16 +690,17 @@ function EntriesPanel({ userId, onClose, pageScale }) {
   useEffect(() => {
     if (panelView !== "pages" || !userId) return
     setPagesLoading(true)
+    setPagesError(false)
     Promise.all([
-      fetchJournalEntries(userId, { activity: "pages-write" })
-        .catch(err => { console.error('[feelbetter] entries pages-write:', err); return [] }),
-      fetchVoiceNotes(userId)
-        .catch(err => { console.error('[feelbetter] entries voices:', err); return [] }),
+      fetchJournalEntries(userId, { activity: "pages-write" }),
+      fetchVoiceNotes(userId),
     ])
       .then(([writings, voices]) => {
         setPagesWriting(writings || [])
         setPagesVoices(voices || [])
+        setPagesError(false)
       })
+      .catch(err => { console.error('[feelbetter] entries pages:', err); setPagesError(true) })
       .finally(() => setPagesLoading(false))
   }, [panelView, userId, pagesKey])
 
@@ -468,11 +708,54 @@ function EntriesPanel({ userId, onClose, pageScale }) {
   useEffect(() => {
     if (panelView !== "compass" || !userId) return
     setCompassLoading(true)
+    setCompassError(false)
     fetchJournalEntries(userId, { activity: "compass" })
-      .catch(err => { console.error('[feelbetter] entries compass:', err); return [] })
-      .then(data => setCompassEntries(data || []))
+      .then(data => { setCompassEntries(data || []); setCompassError(false) })
+      .catch(err => { console.error('[feelbetter] entries compass:', err); setCompassError(true) })
       .finally(() => setCompassLoading(false))
   }, [panelView, userId, compassKey])
+
+  // ── Check if this user has a PIN when the entries panel mounts ────────────
+  // Guests (no userId) have no account → no PIN possible → unlock immediately.
+  // On Supabase error: fail open so a DB glitch doesn't permanently block access.
+  useEffect(() => {
+    if (!userId) {
+      setPinChecked(true)
+      setPinUnlocked(true)
+      return
+    }
+    hasPin(userId)
+      .then(hasPinSet => {
+        if (!hasPinSet) setPinUnlocked(true)  // no PIN → unlock straight away
+        setPinChecked(true)
+      })
+      .catch(() => {
+        // fail open: don't block the user due to a transient DB error
+        setPinUnlocked(true)
+        setPinChecked(true)
+      })
+  }, [userId])
+
+  // ── Handle 4th digit entered on the lock screen ───────────────────────────
+  async function handleLockComplete(value) {
+    if (pinLockLoading) return
+    setPinLockLoading(true)
+    try {
+      const ok = await verifyPin(userId, value)
+      if (ok) {
+        setPinLockError(null)
+        setPinUnlocked(true)   // correct PIN → show entries normally
+      } else {
+        setPinLockError("that's not quite right — try again")
+        setPinLockValue('')    // clear boxes so user can retry cleanly
+      }
+    } catch {
+      setPinLockError("something went wrong — try again")
+      setPinLockValue('')
+    } finally {
+      setPinLockLoading(false)
+    }
+  }
 
   const goHome = () => setPanelView("home")
 
@@ -511,6 +794,139 @@ function EntriesPanel({ userId, onClose, pageScale }) {
     </nav>
   )
 
+  // ── PIN loading: return nothing while we check Supabase (avoids flash) ──────
+  if (!pinChecked) return null
+
+  // ── PIN lock screen: shown before ANY entry content renders ──────────────────
+  // Entry-loading useEffects gate on panelView !== "home", so while this is
+  // showing (panelView is still "home", user can't navigate) nothing loads.
+  if (!pinUnlocked) {
+    return (
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 350,
+        background: "linear-gradient(165deg,#e6f5f7 0%,#d3edf2 48%,#e8f6f8 100%)",
+        fontFamily: "var(--font-dm-sans), sans-serif",
+        color: "#1a3a42",
+      }}>
+
+        {/* ── Back / close button (same shape as NavBar) ── */}
+        <nav style={{ padding: "28px 40px 0" }}>
+          <button
+            onClick={onClose}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 40, height: 40, borderRadius: "50%",
+              background: "rgba(255,255,255,.6)", backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              border: ".5px solid rgba(255,255,255,.8)",
+              cursor: "pointer", transition: "background .2s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.88)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.6)"}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="#2a5a66" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+          </button>
+        </nav>
+
+        {/* ── Centered lock card ── */}
+        <div style={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "20px",
+          // Slight upward shift so it feels centered visually, not mathematically
+          paddingBottom: "80px",
+        }}>
+          <div style={{
+            background: "rgba(255,255,255,.68)",
+            backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+            border: ".5px solid rgba(255,255,255,.92)",
+            borderRadius: 28,
+            padding: "48px 36px 40px",
+            width: "100%", maxWidth: 380,
+            display: "flex", flexDirection: "column", alignItems: "center",
+            boxShadow: "0 8px 32px rgba(60,120,140,.1)",
+            textAlign: "center",
+          }}>
+
+            {/* Lock icon */}
+            <div style={{ marginBottom: 20, color: "#7ac4d0" }}>
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+
+            {/* Heading */}
+            <div style={{
+              fontFamily: "var(--font-dm-serif), serif",
+              fontSize: "clamp(22px, 5vw, 28px)",
+              color: "#0f2e35", marginBottom: 10, lineHeight: 1.2,
+            }}>
+              your entries are private.
+            </div>
+
+            {/* Subtitle */}
+            <div style={{
+              fontSize: 15, color: "#7a9aaa", fontWeight: 300,
+              lineHeight: 1.6, marginBottom: 36, maxWidth: 260,
+            }}>
+              enter your PIN to continue.
+            </div>
+
+            {/* 4-digit PIN boxes */}
+            <PanelPinBoxes
+              value={pinLockValue}
+              onChange={setPinLockValue}
+              onComplete={handleLockComplete}
+              autoFocus={true}
+              disabled={pinLockLoading}
+              hasError={!!pinLockError}
+            />
+
+            {/* Wrong PIN message */}
+            {pinLockError && (
+              <div style={{
+                marginTop: 16, fontSize: 13,
+                color: "#c05a5a", lineHeight: 1.4,
+              }}>
+                {pinLockError}
+              </div>
+            )}
+
+            {/* Verifying feedback */}
+            {pinLockLoading && (
+              <div style={{
+                marginTop: 16, fontSize: 13,
+                color: "#7a9aaa", fontStyle: "italic",
+              }}>
+                checking…
+              </div>
+            )}
+
+            {/* Forgot PIN — closes entries panel and opens settings */}
+            <button
+              onClick={() => { onClose(); router.push('/settings') }}
+              style={{
+                marginTop: 28, background: "none", border: "none", padding: 0,
+                fontSize: 13, color: "#7a9aaa", fontWeight: 300,
+                cursor: "pointer", textDecoration: "underline",
+                textDecorationColor: "rgba(122,154,170,.4)",
+                fontFamily: "var(--font-dm-sans), sans-serif",
+              }}
+            >
+              forgot your PIN? reset it in settings
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Normal entries panel (only reachable after PIN is verified or not set) ──
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 350,
@@ -653,17 +1069,44 @@ function EntriesPanel({ userId, onClose, pageScale }) {
 
               {spillLoading && <EntryShimmer />}
 
-              {!spillLoading && spillEntries.length === 0 && (
+              {!spillLoading && spillError && (
+                <div style={{
+                  background: "rgba(255,255,255,.5)", borderRadius: 18,
+                  padding: "28px 24px", textAlign: "center",
+                }}>
+                  <p style={{ fontSize: 15, color: "#7a9aaa", marginBottom: 14 }}>
+                    couldn&apos;t load your entries right now.
+                  </p>
+                  <button
+                    onClick={() => setSpillKey(k => k + 1)}
+                    style={{
+                      background: "rgba(90,160,180,.13)", border: "none", borderRadius: 20,
+                      padding: "9px 20px", fontSize: 13, color: "#4a8a96", cursor: "pointer",
+                      fontFamily: "var(--font-dm-sans), sans-serif",
+                    }}
+                  >
+                    try again
+                  </button>
+                </div>
+              )}
+
+              {!spillLoading && !spillError && spillEntries.length === 0 && (
                 <PanelEmptyState
                   text="no spills yet."
-                  sub="when you spill something, it&apos;ll appear here."
+                  sub="when you spill something, it'll appear here."
+                  onCta={() => { onClose(); router.push('/activities') }}
+                  ctaLabel="try spilling now"
                 />
               )}
 
-              {!spillLoading && spillEntries.length > 0 && (
+              {!spillLoading && !spillError && spillEntries.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
                   {spillEntries.map(entry => (
-                    <EntryCard key={entry.id} entry={entry} />
+                    <EntryCard
+                      key={entry.id}
+                      entry={entry}
+                      onDelete={id => setSpillEntries(es => es.filter(e => e.id !== id))}
+                    />
                   ))}
                 </div>
               )}
@@ -707,17 +1150,44 @@ function EntriesPanel({ userId, onClose, pageScale }) {
 
               {compassLoading && <EntryShimmer />}
 
-              {!compassLoading && compassEntries.length === 0 && (
+              {!compassLoading && compassError && (
+                <div style={{
+                  background: "rgba(255,255,255,.5)", borderRadius: 18,
+                  padding: "28px 24px", textAlign: "center",
+                }}>
+                  <p style={{ fontSize: 15, color: "#7a9aaa", marginBottom: 14 }}>
+                    couldn&apos;t load your entries right now.
+                  </p>
+                  <button
+                    onClick={() => setCompassKey(k => k + 1)}
+                    style={{
+                      background: "rgba(90,160,180,.13)", border: "none", borderRadius: 20,
+                      padding: "9px 20px", fontSize: 13, color: "#4a8a96", cursor: "pointer",
+                      fontFamily: "var(--font-dm-sans), sans-serif",
+                    }}
+                  >
+                    try again
+                  </button>
+                </div>
+              )}
+
+              {!compassLoading && !compassError && compassEntries.length === 0 && (
                 <PanelEmptyState
                   text="no compass reflections yet."
                   sub="when you trace a feeling, it'll appear here."
+                  onCta={() => { onClose(); router.push('/activities') }}
+                  ctaLabel="try compass now"
                 />
               )}
 
-              {!compassLoading && compassEntries.length > 0 && (
+              {!compassLoading && !compassError && compassEntries.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
                   {compassEntries.map(entry => (
-                    <EntryCard key={entry.id} entry={entry} />
+                    <EntryCard
+                      key={entry.id}
+                      entry={entry}
+                      onDelete={id => setCompassEntries(es => es.filter(e => e.id !== id))}
+                    />
                   ))}
                 </div>
               )}
@@ -761,7 +1231,28 @@ function EntriesPanel({ userId, onClose, pageScale }) {
 
               {pagesLoading && <EntryShimmer />}
 
-              {!pagesLoading && (
+              {!pagesLoading && pagesError && (
+                <div style={{
+                  background: "rgba(255,255,255,.5)", borderRadius: 18,
+                  padding: "28px 24px", textAlign: "center",
+                }}>
+                  <p style={{ fontSize: 15, color: "#7a9aaa", marginBottom: 14 }}>
+                    couldn&apos;t load your entries right now.
+                  </p>
+                  <button
+                    onClick={() => setPagesKey(k => k + 1)}
+                    style={{
+                      background: "rgba(90,160,180,.13)", border: "none", borderRadius: 20,
+                      padding: "9px 20px", fontSize: 13, color: "#4a8a96", cursor: "pointer",
+                      fontFamily: "var(--font-dm-sans), sans-serif",
+                    }}
+                  >
+                    try again
+                  </button>
+                </div>
+              )}
+
+              {!pagesLoading && !pagesError && (
                 <>
                   {/* ── Write notes sub-section ── */}
                   <section style={{ marginBottom: 44 }}>
@@ -770,11 +1261,17 @@ function EntriesPanel({ userId, onClose, pageScale }) {
                       <PanelEmptyState
                         text="no written pages yet."
                         sub="your write-mode entries will appear here."
+                        onCta={() => { onClose(); router.push('/activities') }}
+                        ctaLabel="start writing"
                       />
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         {pagesWriting.map(entry => (
-                          <EntryCard key={entry.id} entry={entry} />
+                          <EntryCard
+                            key={entry.id}
+                            entry={entry}
+                            onDelete={id => setPagesWriting(es => es.filter(e => e.id !== id))}
+                          />
                         ))}
                       </div>
                     )}
@@ -787,11 +1284,17 @@ function EntriesPanel({ userId, onClose, pageScale }) {
                       <PanelEmptyState
                         text="no voice notes yet."
                         sub="your voice recordings will appear here."
+                        onCta={() => { onClose(); router.push('/activities') }}
+                        ctaLabel="try voice notes"
                       />
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         {pagesVoices.map(note => (
-                          <VoiceNoteCard key={note.id} note={note} />
+                          <VoiceNoteCard
+                            key={note.id}
+                            note={note}
+                            onDelete={id => setPagesVoices(ns => ns.filter(n => n.id !== id))}
+                          />
                         ))}
                       </div>
                     )}
@@ -844,7 +1347,8 @@ export default function Dashboard() {
   const [anonymousMode, setAnonymousMode] = useState(false)
   const [isGuest,       setIsGuest]       = useState(false)
   const [clusterScale,  setClusterScale]  = useState(1)
-  const [moodHistory,   setMoodHistory]   = useState([])   // real data from Supabase
+  const [moodHistory,        setMoodHistory]        = useState([])   // real data from Supabase
+  const [moodHistoryLoading, setMoodHistoryLoading] = useState(false)
   const [pageScale,     setPageScale]     = useState(1)
   const [historyOpen,   setHistoryOpen]   = useState(false)
   const [detectOpen,    setDetectOpen]    = useState(false)  // detect-mood overlay visible
@@ -855,15 +1359,24 @@ export default function Dashboard() {
   const clusterWrapRef = useRef(null)
 
   useEffect(() => {
+    // Guest flag wins over any cached Supabase session.
+    // signInAsGuest() doesn't sign out Supabase, so user may still be non-null here.
+    // Checking the flag first prevents the previous user's name/data from leaking in.
+    const guestFlag = localStorage.getItem("isGuest") === "true"
+    if (guestFlag) {
+      setIsGuest(true)
+      return  // skip all user-specific fetches
+    }
+
     if (user) {
-      localStorage.removeItem("isGuest")
       setIsGuest(false)
       // Load real mood history from Supabase whenever the user is available
-      fetchLast7Days(user.id).then(moods => setMoodHistory(moods))
-    } else {
-      const guest = localStorage.getItem("isGuest") === "true"
-      setIsGuest(guest)
-      if (!loading && !guest) router.replace("/login")
+      setMoodHistoryLoading(true)
+      fetchLast7Days(user.id)
+        .then(moods => setMoodHistory(moods))
+        .finally(() => setMoodHistoryLoading(false))
+    } else if (!loading) {
+      router.replace("/login")
     }
   }, [user, loading])
 
@@ -898,9 +1411,12 @@ export default function Dashboard() {
     setOverlayState(1)
     // Save to DB for logged-in, non-anonymous users; refresh sidebar dots after save
     if (user && !anonymousMode) {
-      saveMood(user.id, id, 1).then(() =>
-        fetchLast7Days(user.id).then(moods => setMoodHistory(moods))
-      )
+      saveMood(user.id, id, 1).then(() => {
+        setMoodHistoryLoading(true)
+        fetchLast7Days(user.id)
+          .then(moods => setMoodHistory(moods))
+          .finally(() => setMoodHistoryLoading(false))
+      })
     }
   }
   function closeOverlay() { setMoodOverlay(null); setOverlayState(1) }
@@ -1008,16 +1524,18 @@ export default function Dashboard() {
         .fb-toggle.on{background:#7ac4d0}
         .fb-toggle-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:left .3s}
         .fb-toggle.on .fb-toggle-thumb{left:21px}
-        .fb-sidebar-middle{flex:1;padding:0 22px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+        .fb-sidebar-middle{flex:1;padding:18px 20px 28px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
         .fb-sidebar-middle::-webkit-scrollbar{display:none}
-        .fb-sidebar-section{margin-bottom:20px}
-        .fb-sidebar-section-label{font-size:12px;letter-spacing:.3px;text-transform:uppercase;color:#4a8a96;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .fb-sidebar-section{margin-bottom:18px}
+        .fb-sidebar-section-label{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#4a8a96;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+        .fb-sidebar-section-label svg{width:16px;height:16px;flex-shrink:0}
         .fb-mood-dots{display:flex;gap:8px;flex-wrap:wrap}
-        .fb-mood-dot{width:20px;height:20px;border-radius:50%;background:#ccc;cursor:pointer;transition:transform .2s}
+        .fb-mood-dot{width:20px;height:20px;border-radius:50%;cursor:pointer;transition:transform .2s}
         .fb-mood-dot:hover{transform:scale(1.15)}
-        .fb-history-item{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:rgba(255,255,255,.5);border-radius:10px;cursor:pointer;font-size:14px;color:#1a3a42}
-        .fb-history-item:hover{background:rgba(255,255,255,.8)}
-        .fb-lock-icon{width:16px;height:16px}
+        @keyframes fbDotPulse{0%,100%{opacity:.28}50%{opacity:.65}}
+        .fb-history-item{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:rgba(255,255,255,.5);border-radius:12px;cursor:pointer;font-size:14px;color:#1a3a42;transition:background .2s;border:.5px solid rgba(255,255,255,.7)}
+        .fb-history-item:hover{background:rgba(255,255,255,.82)}
+        .fb-lock-icon{width:15px;height:15px;flex-shrink:0;color:#7a9aaa}
         .fb-sidebar-bottom{padding:20px 22px;border-top:1px solid rgba(0,0,0,.08);flex-shrink:0}
         .fb-logout{font-size:14px;color:#4a8a96;cursor:pointer;display:flex;align-items:center;gap:8px}
 
@@ -1029,11 +1547,11 @@ export default function Dashboard() {
           .fb-profile-action{font-size:12px}
           .fb-anon-toggle{padding:8px 0;margin-bottom:10px}
           .fb-anon-label{font-size:13px}
-          .fb-sidebar-middle{padding:0 16px}
+          .fb-sidebar-middle{padding:16px 16px 22px}
           .fb-sidebar-section{margin-bottom:14px}
-          .fb-sidebar-section-label{font-size:11px;margin-bottom:8px}
-          .fb-sidebar-section-label svg{width:15px;height:15px}
-          .fb-history-item{font-size:13px;padding:8px 12px}
+          .fb-sidebar-section-label{font-size:10px;letter-spacing:1px;margin-bottom:7px}
+          .fb-sidebar-section-label svg{width:14px;height:14px}
+          .fb-history-item{font-size:13px;padding:10px 12px}
           .fb-sidebar-bottom{padding:14px 16px}
           .fb-logout{font-size:13px}
           .fb-mood-dot{width:17px;height:17px}
@@ -1123,13 +1641,16 @@ export default function Dashboard() {
           .fb-hamburger{display:flex;gap:6px}
           .fb-hamburger span{width:30px;height:2.5px;border-radius:3px}
 
-          /* Sidebar → fixed drawer */
+          /* Sidebar → fixed drawer
+             overflow:hidden keeps the outer container from scrolling so that
+             fb-sidebar-bottom (logout) stays pinned at the bottom at all times.
+             Only fb-sidebar-middle scrolls internally via its own overflow-y:auto. */
           .fb-sidebar{
             display:none;position:fixed;top:0;left:0;z-index:200;
-            width:300px;height:100%;flex-direction:column;
+            width:300px;height:100vh;flex-direction:column;
             background:linear-gradient(180deg,#dceef2,#cde7ed);
             box-shadow:24px 0 60px rgba(40,90,105,.16);
-            padding:20px 20px 18px;overflow-y:auto;border-right:none;
+            overflow:hidden;border-right:none;
           }
           .fb-sidebar.open{display:flex}
           .fb-sidebar-overlay.open{display:block}
@@ -1224,6 +1745,8 @@ export default function Dashboard() {
           transformOrigin: "top left",
           transform: `scale(${pageScale})`,
           width: pageScale < 1 ? `${(100 / pageScale).toFixed(3)}vw` : undefined,
+          opacity: mounted ? 1 : 0,
+          transition: "opacity 0.28s ease",
         }}
       >
 
@@ -1252,7 +1775,13 @@ export default function Dashboard() {
           {/* ── SIDEBAR ────────────────────────────────────────────────────── */}
           <aside
             className={`fb-sidebar ${sidebarOpen ? "open" : ""}`}
-            style={isDesktop ? { transform: `scale(${pageScale})`, transformOrigin: "top left" } : {}}
+            style={isDesktop ? {
+              transform: `scale(${pageScale})`,
+              transformOrigin: "top left",
+              // After scaling, 100vh becomes pageScale*100vh visually.
+              // Dividing by pageScale makes the visual height always equal 100vh.
+              height: `${(100 / pageScale).toFixed(2)}vh`,
+            } : {}}
           >
             <div className="fb-sidebar-top">
               <div className="fb-sidebar-close">
@@ -1272,21 +1801,29 @@ export default function Dashboard() {
                 </div>
                 <div className="fb-profile-info">
                   <div className="fb-profile-name">{anonymousMode ? "soul" : isGuest ? "guest" : firstName}</div>
-                  <div className="fb-profile-action">{anonymousMode ? "hidden from view" : isGuest ? "not saved" : "tap for settings"}</div>
+                  <div
+                    className="fb-profile-action"
+                    onClick={() => !anonymousMode && !isGuest && router.push("/settings")}
+                  >
+                    {anonymousMode ? "hidden from view" : isGuest ? "not saved" : "tap for settings"}
+                  </div>
                 </div>
               </div>
-              <div className="fb-anon-toggle">
-                <div className="fb-anon-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                    <circle cx="12" cy="7" r="4"/>
-                  </svg>
+              {/* Anonymous mode toggle — hidden for guests (they're already anonymous) */}
+              {!isGuest && (
+                <div className="fb-anon-toggle">
+                  <div className="fb-anon-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                  </div>
+                  <label className="fb-anon-label">anonymous mode</label>
+                  <button className={`fb-toggle ${anonymousMode ? "on" : ""}`} onClick={() => setAnonymousMode(a => !a)}>
+                    <div className="fb-toggle-thumb" />
+                  </button>
                 </div>
-                <label className="fb-anon-label">anonymous mode</label>
-                <button className={`fb-toggle ${anonymousMode ? "on" : ""}`} onClick={() => setAnonymousMode(a => !a)}>
-                  <div className="fb-toggle-thumb" />
-                </button>
-              </div>
+              )}
             </div>
 
             <div className="fb-sidebar-middle">
@@ -1298,15 +1835,22 @@ export default function Dashboard() {
                   last 7 days
                 </div>
                 <div className="fb-mood-dots">
-                  {moodHistory.length > 0 ? (
-                    moodHistory.map((m, i) => (
-                      <div key={i} className="fb-mood-dot" style={{ backgroundColor: MOOD_COLORS[m] }} />
-                    ))
-                  ) : (
-                    <span style={{ fontSize:14, color:"#7c9098", fontStyle:"italic" }}>
-                      {user ? "no check-ins yet this week" : "log in to track moods"}
-                    </span>
-                  )}
+                  {/* Always render 7 slots — filled when data exists, faded placeholder otherwise */}
+                  {Array.from({ length: 7 }).map((_, i) => {
+                    const mood = moodHistory[i]
+                    return (
+                      <div
+                        key={i}
+                        className="fb-mood-dot"
+                        style={{
+                          backgroundColor: mood ? MOOD_COLORS[mood] : "rgba(90,150,160,.16)",
+                          animation: moodHistoryLoading
+                            ? `fbDotPulse 1.5s ease-in-out ${i * 0.08}s infinite`
+                            : "none",
+                        }}
+                      />
+                    )
+                  })}
                 </div>
               </div>
               <div className="fb-sidebar-section">
@@ -1337,9 +1881,9 @@ export default function Dashboard() {
                   </svg>
                   ambient sound
                 </div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                   {["ocean waves","rain","forest","silence"].map((s, i) => (
-                    <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:isDesktop?"22px":"13px", padding:isDesktop?"9px 20px":"6px 12px", borderRadius:24, cursor:"pointer" }}>{s}</span>
+                    <span key={i} style={{ background:i===0?"#5eb4c2":"rgba(255,255,255,.6)", color:i===0?"#fff":"#4a5d64", fontSize:13, padding:"6px 12px", borderRadius:20, cursor:"pointer", border:".5px solid rgba(255,255,255,.7)", transition:"background .18s" }}>{s}</span>
                   ))}
                 </div>
               </div>
@@ -1351,13 +1895,15 @@ export default function Dashboard() {
                   activities
                 </div>
                 <div
+                  className="fb-history-item"
                   onClick={() => router.push("/activities")}
-                  style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:isDesktop?"16px 20px":"10px 14px", background:"rgba(255,255,255,.5)", borderRadius:12, cursor:"pointer", fontSize:isDesktop?22:13, color:"#1a3a42", transition:"background .2s" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.82)"}
                   onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
                 >
                   <span>explore activities</span>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
                 </div>
               </div>
               <div className="fb-sidebar-section">
@@ -1368,10 +1914,26 @@ export default function Dashboard() {
                   </svg>
                   settings
                 </div>
+                {!isGuest && (
+                  <div
+                    className="fb-history-item"
+                    onClick={() => router.push("/settings")}
+                    style={{ cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.8)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
+                  >
+                    <span>preferences & account</span>
+                    <svg className="fb-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </div>
+                )}
               </div>
-              <div style={{ background:"rgba(255,255,255,.55)", borderRadius:18, padding:isDesktop?"22px 24px":"14px 16px", fontSize:isDesktop?26:14, lineHeight:1.4, color:"#46606a", display:"flex", alignItems:"flex-start", gap:12, marginBottom:isDesktop?24:16 }}>
-                🌸 you&#39;ve checked in 4 days this week.
-              </div>
+              {!isGuest && (
+                <div style={{ background:"rgba(255,255,255,.55)", borderRadius:14, padding:"13px 15px", fontSize:13, lineHeight:1.5, color:"#46606a", display:"flex", alignItems:"flex-start", gap:10, marginBottom:16, border:".5px solid rgba(255,255,255,.72)" }}>
+                  🌸 you&#39;ve checked in 4 days this week.
+                </div>
+              )}
             </div>
 
             <div className="fb-sidebar-bottom">
@@ -1386,7 +1948,9 @@ export default function Dashboard() {
 
           {/* ── MAIN CONTENT ───────────────────────────────────────────────── */}
           <div className="fb-main">
-            <p className="fb-greeting">{anonymousMode ? "hello there," : `hello ${firstName},`}</p>
+            <p className="fb-greeting">
+              {(anonymousMode || isGuest) ? "hello there," : `hello ${firstName},`}
+            </p>
             <p className="fb-subgreeting">{mounted ? getSubGreeting() : ""}</p>
 
             {/* CHECK-IN CARD */}
@@ -1398,12 +1962,12 @@ export default function Dashboard() {
                 DAILY CHECK-IN
               </div>
               <h2 className="fb-checkin-heading">
-                {isDesktop ? <><span>how do you</span><br /><span>feel right now?</span></> : "how do you feel right now?"}
+                {(mounted && isDesktop) ? <><span>how do you</span><br /><span>feel right now?</span></> : "how do you feel right now?"}
               </h2>
               <p className="fb-checkin-hint">pick one. nothing shifts unless you&#39;re ready.</p>
 
               {/* MOOD CLUSTER — desktop: absolute organic blobs | mobile: flex grid */}
-              {isDesktop ? (
+              {(mounted && isDesktop) ? (
                 /* outer div measures available width; inner cluster scales to fit */
                 <div ref={clusterWrapRef} style={{ width:"100%", height: clusterScale * 600, overflow:"visible" }}>
                 <div className="fb-moods-cluster-desktop" style={{ transform:`scale(${clusterScale})`, transformOrigin:"top left" }}>
@@ -1623,7 +2187,7 @@ export default function Dashboard() {
           ══════════════════════════════════════════════════════════════════════ */}
       {historyOpen && (
         <EntriesPanel
-          userId={user?.id}
+          userId={isGuest ? null : user?.id}
           onClose={() => setHistoryOpen(false)}
           pageScale={pageScale}
         />

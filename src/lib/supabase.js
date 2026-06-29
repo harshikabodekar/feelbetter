@@ -180,3 +180,52 @@ export async function getSignedUrl(filePath, expiresIn = 3600) {
   }
   return data?.signedUrl || null
 }
+
+// ── Delete helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Delete a single journal entry (spill, pages-write, compass, etc.).
+ * RLS ensures users can only delete their own rows.
+ * Throws a user-friendly string on failure.
+ *
+ * @param {string} entryId  - journal_entries.id
+ */
+export async function deleteJournalEntry(entryId) {
+  const { error } = await supabase
+    .from('journal_entries')
+    .delete()
+    .eq('id', entryId)
+
+  if (error) {
+    console.error('[feelbetter] deleteJournalEntry:', error.message)
+    throw new Error("couldn't remove that entry — please try again.")
+  }
+}
+
+/**
+ * Delete a voice note: removes both the Storage file and the DB row.
+ * Logs a warning if the Storage removal fails but still deletes the DB row.
+ * Throws a user-friendly string if the DB delete fails.
+ *
+ * @param {string} noteId   - voice_notes.id
+ * @param {string} filePath - voice_notes.file_path (needed to remove from Storage)
+ */
+export async function deleteVoiceNote(noteId, filePath) {
+  // Remove the audio file from Storage (non-fatal if it fails)
+  if (filePath) {
+    const { error: storageErr } = await supabase.storage
+      .from('voice-notes')
+      .remove([filePath])
+    if (storageErr) console.warn('[feelbetter] deleteVoiceNote storage:', storageErr.message)
+  }
+
+  const { error } = await supabase
+    .from('voice_notes')
+    .delete()
+    .eq('id', noteId)
+
+  if (error) {
+    console.error('[feelbetter] deleteVoiceNote:', error.message)
+    throw new Error("couldn't remove that recording — please try again.")
+  }
+}
