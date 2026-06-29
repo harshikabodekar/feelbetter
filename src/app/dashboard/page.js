@@ -1360,6 +1360,7 @@ export default function Dashboard() {
   const [clock,         setClock]         = useState("")
   const [moodOverlay,   setMoodOverlay]   = useState(null)   // which mood overlay is open
   const [overlayState,  setOverlayState]  = useState(1)      // 1 = "I see you", 2 = "I've got you"
+  const [overlayPhase,  setOverlayPhase]  = useState("visible") // "visible" | "fading-out" | "fading-in"
   const [breatheText,   setBreatheText]   = useState("tap to begin a 4·7·8 cycle")
   const [breatheActive, setBreatheActive] = useState(false)
   const [sidebarOpen,   setSidebarOpen]   = useState(false)
@@ -1461,6 +1462,7 @@ export default function Dashboard() {
   function openMood(id) {
     setMoodOverlay(id)
     setOverlayState(1)
+    setOverlayPhase("visible")
     // Save to DB for logged-in, non-anonymous users; refresh sidebar dots after save
     if (user && !anonymousMode) {
       saveMood(user.id, id, 1).then(() => {
@@ -1471,7 +1473,16 @@ export default function Dashboard() {
       })
     }
   }
-  function closeOverlay() { setMoodOverlay(null); setOverlayState(1) }
+  function closeOverlay() { setMoodOverlay(null); setOverlayState(1); setOverlayPhase("visible") }
+
+  function handleAdvanceToS2() {
+    setOverlayPhase("fading-out")
+    setTimeout(() => {
+      setOverlayState(2)
+      setOverlayPhase("fading-in")
+      setTimeout(() => setOverlayPhase("visible"), 540)
+    }, 430)
+  }
 
   function openWhisper() {
     const prompt = WHISPER_PROMPTS[Math.floor(Math.random() * WHISPER_PROMPTS.length)]
@@ -1594,7 +1605,7 @@ export default function Dashboard() {
         .fb-profile-avatar{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#7ac4d0,#5aaabb);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;flex-shrink:0}
         .fb-profile-info{flex:1}
         .fb-profile-name{font-size:17px;color:#0f2e35;font-weight:500}
-        .fb-profile-action{font-size:13px;color:#4a8a96;cursor:pointer;text-decoration:underline;margin-top:3px}
+        .fb-profile-action{font-size:13px;color:#4a8a96;text-decoration:underline;margin-top:3px}
         .fb-anon-toggle{display:flex;align-items:center;gap:10px;padding:10px 0;margin-bottom:14px}
         .fb-anon-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .fb-anon-label{font-size:14px;color:#1a3a42;flex:1}
@@ -1612,6 +1623,12 @@ export default function Dashboard() {
         .fb-mood-dot:hover{transform:scale(1.15)}
         @keyframes fbDotPulse{0%,100%{opacity:.28}50%{opacity:.65}}
         @keyframes fbSoundPulse{0%,100%{box-shadow:0 3px 12px rgba(94,180,194,.3)}50%{box-shadow:0 3px 22px rgba(94,180,194,.6)}}
+        @keyframes fbStoryFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+        .fb-story-text{animation:fbStoryFade .25s ease both}
+        @keyframes fbMoodFadeOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(12px)}}
+        @keyframes fbMoodFadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+        .fb-mood-fading-out{animation:fbMoodFadeOut .4s ease-in-out forwards}
+        .fb-mood-fading-in{animation:fbMoodFadeIn .5s ease-in-out both}
         .fb-history-item{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:rgba(255,255,255,.5);border-radius:12px;cursor:pointer;font-size:14px;color:#1a3a42;transition:background .2s;border:.5px solid rgba(255,255,255,.7)}
         .fb-history-item:hover{background:rgba(255,255,255,.82)}
         .fb-lock-icon{width:15px;height:15px;flex-shrink:0;color:#7a9aaa}
@@ -1864,7 +1881,11 @@ export default function Dashboard() {
           <div className="fb-sidebar-close">
             <button className="fb-sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
           </div>
-          <div className="fb-profile">
+          <div
+            className="fb-profile"
+            onClick={() => !isGuest && router.push("/settings")}
+            style={{ cursor: isGuest ? "default" : "pointer" }}
+          >
             <div className="fb-profile-avatar" style={anonymousMode ? { background:"linear-gradient(135deg,#6b7fa8,#4a5a80)" } : {}}>
               {anonymousMode
                 ? <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
@@ -1878,11 +1899,8 @@ export default function Dashboard() {
             </div>
             <div className="fb-profile-info">
               <div className="fb-profile-name">{anonymousMode ? "soul" : isGuest ? "guest" : firstName}</div>
-              <div
-                className="fb-profile-action"
-                onClick={() => !anonymousMode && !isGuest && router.push("/settings")}
-              >
-                {anonymousMode ? "hidden from view" : isGuest ? "not saved" : "tap for settings"}
+              <div className="fb-profile-action">
+                {anonymousMode ? "hidden from view" : isGuest ? "not saved" : (isDesktop ? "view settings" : "tap for settings")}
               </div>
             </div>
           </div>
@@ -1951,7 +1969,7 @@ export default function Dashboard() {
           </div>
           <div className="fb-sidebar-section">
             <div className="fb-sidebar-section-label">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>
               </svg>
               ambient sound
@@ -2011,7 +2029,11 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="fb-sidebar-section">
-            <div className="fb-sidebar-section-label">
+            <div
+              className="fb-sidebar-section-label"
+              onClick={() => !isGuest && router.push("/settings")}
+              style={{ cursor: isGuest ? "default" : "pointer" }}
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M4 8h8M16 8h4M4 16h4M12 16h8"/>
                 <circle cx="14" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/>
@@ -2033,11 +2055,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          {!isGuest && (
-            <div style={{ background:"rgba(255,255,255,.55)", borderRadius:14, padding:"13px 15px", fontSize:13, lineHeight:1.5, color:"#46606a", display:"flex", alignItems:"flex-start", gap:10, marginBottom:16, border:".5px solid rgba(255,255,255,.72)" }}>
-              🌸 you&#39;ve checked in 4 days this week.
-            </div>
-          )}
         </div>
 
         <div className="fb-sidebar-bottom">
@@ -2287,7 +2304,6 @@ export default function Dashboard() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     play
                   </button>
-                  <span className="fb-browse-link">browse library</span>
                 </div>
               </div>
               <div className="fb-blob" />
@@ -2301,10 +2317,10 @@ export default function Dashboard() {
               onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.5)"}
             >
               <div>
-                <div style={{ fontSize:26, letterSpacing:1.6, textTransform:"uppercase", color:"#6a9aaa", fontWeight:500, marginBottom:6 }}>ACTIVITIES</div>
-                <div style={{ fontSize:34, color:"#3c4f57", fontWeight:300 }}>something small to do right now</div>
+                <div style={{ fontSize:11, letterSpacing:2, textTransform:"uppercase", color:"#6a9aaa", fontWeight:600, marginBottom:8 }}>ACTIVITIES</div>
+                <div style={{ fontSize:18, color:"#3c4f57", fontWeight:300, lineHeight:1.45 }}>something small to do right now</div>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:8, color:"#4a8a96", fontSize:29, fontWeight:400, flexShrink:0 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, color:"#4a8a96", fontSize:15, fontWeight:400, flexShrink:0 }}>
                 explore
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </div>
@@ -2563,15 +2579,19 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* Story text */}
-            <div style={{
-              maxWidth: 520, textAlign: "center",
-              fontFamily: "var(--font-dm-serif), serif",
-              fontSize: "clamp(22px, 3.5vw, 32px)",
-              color: "rgba(220,240,248,.92)",
-              lineHeight: 1.5, fontWeight: 400,
-              letterSpacing: ".2px",
-            }}>
+            {/* Story text — key re-mounts on each page change, triggering the CSS fade-in */}
+            <div
+              key={storyPage}
+              className="fb-story-text"
+              style={{
+                maxWidth: 520, textAlign: "center",
+                fontFamily: "var(--font-dm-serif), serif",
+                fontSize: "clamp(22px, 3.5vw, 32px)",
+                color: "rgba(220,240,248,.92)",
+                lineHeight: 1.5, fontWeight: 400,
+                letterSpacing: ".2px",
+              }}
+            >
               {pages[storyPage]}
             </div>
 
@@ -2973,7 +2993,10 @@ export default function Dashboard() {
             </div>
           )}
 
-          <div className="fb-overlay-content" style={{ position:"relative", maxWidth:860, display:"flex", flexDirection:"column", alignItems:"center", padding:isDesktop?"0 32px":"64px 20px 52px" }}>
+          <div
+            className={`fb-overlay-content${overlayPhase === "fading-out" ? " fb-mood-fading-out" : overlayPhase === "fading-in" ? " fb-mood-fading-in" : ""}`}
+            style={{ position:"relative", maxWidth:860, display:"flex", flexDirection:"column", alignItems:"center", padding:isDesktop?"0 32px":"64px 20px 52px" }}
+          >
             <div style={{ color:st.accent, marginBottom:isDesktop?40:22, display:"flex", justifyContent:"center" }}>
               <OverlayIcon icon={overlayDef.icon} color={st.accent} />
             </div>
@@ -2996,7 +3019,7 @@ export default function Dashboard() {
                 </div>
               )}
               <div
-                onClick={isS1 ? () => setOverlayState(2) : closeOverlay}
+                onClick={isS1 ? handleAdvanceToS2 : closeOverlay}
                 style={{
                   display:"flex", alignItems:"center", gap:isDesktop?12:8,
                   background: isS1 ? st.accent : "rgba(255,255,255,.32)",

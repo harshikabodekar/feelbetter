@@ -205,23 +205,15 @@ function SpillContent() {
       saveJournalEntry(user.id, { activity: "spill", content: text.trim(), mood })
     }
 
-    // DEBUG (browser console) — open DevTools → Console tab to see these
-    console.log('[spill-ui] handleRelease fired, mode:', aiMode, '| text length:', text.trim().length)
-
     try {
-      console.log('[spill-ui] sending fetch to /api/spill …')
       const res = await fetch("/api/spill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text.trim(), mode: aiMode }),
       })
-      console.log('[spill-ui] fetch responded, HTTP status:', res.status)
       const data = await res.json()
-      console.log('[spill-ui] parsed JSON response:', data)
       setResponse(data.response)
-    } catch (err) {
-      // This fires if fetch fails entirely (network error) OR if res.json() throws.
-      console.error('[spill-ui] fetch/parse error — showing fallback:', err)
+    } catch {
       setResponse("i'm here. whatever you wrote, i'm holding it gently.")
     } finally {
       setLoading(false)

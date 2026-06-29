@@ -18,7 +18,7 @@ export default function LoginPage() {
       const w = window.innerWidth
       const h = window.innerHeight
       setIsDesktop(w >= 1024)
-      setPageScale(w >= 1024 ? Math.min(1, w / 1440, h / 900) : 1)
+      setPageScale(w >= 1024 ? Math.min(1, w / 1920) : 1)
     }
     check()
     window.addEventListener('resize', check)
@@ -61,7 +61,7 @@ export default function LoginPage() {
     borderRadius: '12px',
     fontSize: '1rem',         // stay at 16px — prevents iOS zoom
     boxSizing: 'border-box',
-    fontFamily: 'Georgia, serif',
+    fontFamily: "var(--font-dm-sans), sans-serif",
     background: 'rgba(255, 255, 255, 0.07)',
     color: '#e8f8f9',
     outline: 'none',
@@ -85,7 +85,7 @@ export default function LoginPage() {
       alignItems: 'center',
       justifyContent: isMobile ? 'flex-start' : 'center',
       flexDirection: isMobile ? 'column' : 'row',
-      fontFamily: 'Georgia, serif',
+      fontFamily: "var(--font-dm-sans), sans-serif",
       background: 'linear-gradient(180deg, #03214a 0%, #06527a 35%, #0e8fa3 65%, #a8e6e8 100%)',
       position: 'relative',
       overflowX: 'hidden',
@@ -174,7 +174,7 @@ export default function LoginPage() {
               </div>
               <h2 style={{
                 color: '#e8f8f9',
-                // Desktop: bold 3rem wordmark. Mobile: 1.35rem — readable, not oversized.
+                fontFamily: "var(--font-dm-serif), serif",
                 fontSize: isDesktop ? '3rem' : '1.35rem',
                 fontWeight: '700', margin: 0, letterSpacing: '0.1em',
               }}>feelbetter</h2>
@@ -182,10 +182,10 @@ export default function LoginPage() {
 
             {/* Quote */}
             <h1 style={{
-              // Desktop: 3rem headline. Mobile: 1.05rem — same message, much smaller footprint.
+              fontFamily: "var(--font-dm-serif), serif",
               fontSize: isDesktop ? '3rem' : '1.05rem',
               color: '#e8f8f9',
-              fontWeight: '700',
+              fontWeight: '400',
               lineHeight: '1.35',
               margin: isDesktop ? '0 0 24px 0' : '0 0 6px 0',
               letterSpacing: '0.02em',
@@ -343,7 +343,7 @@ export default function LoginPage() {
                 opacity: submitting ? 0.7 : 1,
                 boxShadow: '0 4px 20px rgba(14,143,163,0.35)',
                 marginBottom: isMobile ? '10px' : '14px',
-                fontFamily: 'Georgia, serif',
+                fontFamily: "var(--font-dm-sans), sans-serif",
               }}>
                 {submitting ? '...' : (isSignUp ? 'Create Account' : 'Sign In') + ' →'}
               </button>
@@ -372,7 +372,7 @@ export default function LoginPage() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 gap: '10px',
                 marginBottom: isMobile ? '8px' : '12px',
-                fontFamily: 'Georgia, serif',
+                fontFamily: "var(--font-dm-sans), sans-serif",
               }}>
                 <svg width="17" height="17" viewBox="0 0 18 18">
                   <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
@@ -394,7 +394,7 @@ export default function LoginPage() {
                 fontSize: isMobile ? '0.9rem' : '1rem',
                 fontWeight: '600',
                 letterSpacing: '0.05em', cursor: 'pointer',
-                fontFamily: 'Georgia, serif',
+                fontFamily: "var(--font-dm-sans), sans-serif",
               }}>
                 Continue as Guest
               </button>

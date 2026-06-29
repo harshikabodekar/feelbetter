@@ -87,82 +87,36 @@ const FALLBACK = "i'm here. whatever you wrote, i'm holding it gently."
 
 export async function POST(request) {
   try {
-    // ── DEBUG 1: confirm the API key is loaded from .env.local ──────────────
-    console.log('[spill] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY)
-
-    // Read the user's spilled text and chosen sub-mode from the request body.
-    // `mode` will be one of: "validate" | "honest" | "guide" | "sit"
     const { text, mode } = await request.json()
-    console.log('[spill] received → mode:', mode, '| text length:', text?.length)
 
-    // Guard: if either value is missing, return the fallback gracefully.
     if (!text || !mode) {
-      console.log('[spill] missing text or mode — returning fallback')
       return NextResponse.json({ response: FALLBACK })
     }
 
-    // Pick the system prompt for this mode (default to "validate" if unknown).
     const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.validate
 
-    // ── Build the request body once so we can log it ────────────────────────
     const requestBody = {
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text }],
-        },
-      ],
-      generationConfig: {
-        maxOutputTokens: 800,
-        temperature: 0.88,
-      },
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text }] }],
+      generationConfig: { maxOutputTokens: 800, temperature: 0.88 },
     }
 
-    // ── DEBUG 2: show the URL (key redacted) + body shape before the call ───
-    const url = `${GEMINI_ENDPOINT}?key=${process.env.GEMINI_API_KEY}`
-    console.log('[spill] calling Gemini →', GEMINI_ENDPOINT)
-    console.log('[spill] request body (system prompt omitted for brevity):', JSON.stringify({
-      ...requestBody,
-      system_instruction: { parts: [{ text: '(see SYSTEM_PROMPTS)' }] },
-    }))
-
-    // ── Call Gemini REST API ───────────────────────────────────────────────
-    const geminiRes = await fetch(url, {
+    const geminiRes = await fetch(`${GEMINI_ENDPOINT}?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
     })
 
-    // ── DEBUG 3: HTTP status from Gemini ────────────────────────────────────
-    console.log('[spill] Gemini HTTP status:', geminiRes.status, geminiRes.statusText)
-
-    // ── Parse the Gemini response ──────────────────────────────────────────
-    // The response shape is:
-    //   { candidates: [{ content: { parts: [{ text: "..." }] } }] }
     const data = await geminiRes.json()
-
-    // ── DEBUG 4: full raw response from Gemini ───────────────────────────────
-    console.log('[spill] Gemini raw response:', JSON.stringify(data, null, 2))
-
-    // Extract the text from the first candidate's first part.
     const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    console.log('[spill] extracted aiText:', aiText)
 
-    // If Gemini returned something, send it. Otherwise use the fallback.
     if (aiText && aiText.trim()) {
       return NextResponse.json({ response: aiText.trim() })
     }
 
-    // Gemini returned an empty or unexpected shape — use fallback.
-    console.log('[spill] aiText was empty — returning fallback')
     return NextResponse.json({ response: FALLBACK })
 
-  } catch (err) {
-    // ── DEBUG 5: log the actual error before returning the fallback ──────────
-    console.error('[spill] caught error:', err)
+  } catch {
     return NextResponse.json({ response: FALLBACK })
   }
 }
